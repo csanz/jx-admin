@@ -30,6 +30,7 @@ let client;
 let db;
 
 before(async () => {
+  if (skip) return;
   client = await mongoClientFor(URI);
   db = client.db(DB_NAME);
   await db.collection("users").insertMany([
@@ -55,6 +56,7 @@ before(async () => {
 }, { skip });
 
 after(async () => {
+  if (skip) return;
   if (db) await db.dropDatabase();
   if (client) await client.close();
 }, { skip });

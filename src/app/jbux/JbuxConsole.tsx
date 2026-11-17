@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * JBUX, admin side: the ledger report (GET /api/jbox/report with the four filters), an admin refund
- * (POST /api/jbox/refund { receiptId, reason }) and a wallet hold (POST /api/jbox/hold { userId, hold, reason }).
+ * JBUX, admin side: the ledger report (GET /api/jbox/report with the four filters, read from the platform database),
+ * an admin refund (POST /api/jbox/refund { receiptId, reason }) and a wallet hold (POST /api/jbox/hold { userId,
+ * hold, reason }). The two money actions are carried out by the portal (one implementation of the money rules) and
+ * need the portal link: without it the forms are shown disabled with "money actions need the portal link".
  * Every write asks for confirmation first; errors show inline next to the form that caused them.
  * Response shapes follow the portal's JboxReport (src/lib/wallet-admin.ts) and the two write routes.
  */
@@ -36,7 +38,9 @@ async function postJson(path: string, body: unknown): Promise<{ ok: boolean; sta
   return { ok: res.ok, status: res.status, body: json };
 }
 
-export function JbuxConsole({ adminEmail }: { adminEmail: string }) {
+const NOT_LINKED = "Money actions need the portal link (the portal URL and service token in the console's environment).";
+
+export function JbuxConsole({ adminEmail, portalLinked }: { adminEmail: string; portalLinked: boolean }) {
   const [funding, setFunding] = useState("");
   const [kind, setKind] = useState("");
   const [from, setFrom] = useState("");
@@ -165,15 +169,16 @@ export function JbuxConsole({ adminEmail }: { adminEmail: string }) {
         )}
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 mt-8">
-        <RefundForm onDone={load} />
-        <HoldForm onDone={load} />
+      {!portalLinked && <p role="status" className="mt-8 mb-3 text-sm text-notice">{NOT_LINKED}</p>}
+      <div className={`grid gap-4 sm:grid-cols-2 ${portalLinked ? "mt-8" : ""}`}>
+        <RefundForm onDone={load} enabled={portalLinked} />
+        <HoldForm onDone={load} enabled={portalLinked} />
       </div>
     </div>
   );
 }
 
-function RefundForm({ onDone }: { onDone: () => Promise<void> }) {
+function RefundForm({ onDone, enabled }: { onDone: () => Promise<void>; enabled: boolean }) {
   const [receiptId, setReceiptId] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -182,6 +187,7 @@ function RefundForm({ onDone }: { onDone: () => Promise<void> }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!enabled) { setError(NOT_LINKED); return; }
     setError("");
     setResult(null);
     const id = receiptId.trim();
@@ -203,15 +209,16 @@ function RefundForm({ onDone }: { onDone: () => Promise<void> }) {
   };
 
   return (
-    <form onSubmit={submit} className="bg-surface border border-border rounded-xl p-4 space-y-3" aria-labelledby="refund-h">
+    <form onSubmit={submit} className={`bg-surface border border-border rounded-xl p-4 space-y-3 ${enabled ? "" : "opacity-60"}`} aria-labelledby="refund-h">
       <h2 id="refund-h" className="text-base text-text font-semibold">Refund a receipt</h2>
+      {!enabled && <p className="text-xs text-text-subtle">Disabled: money actions need the portal link.</p>}
       <div>
         <label className={label} htmlFor="r-receipt">Receipt id</label>
-        <input id="r-receipt" className={input} value={receiptId} onChange={(e) => setReceiptId(e.target.value)} maxLength={128} placeholder="rcpt_..." autoComplete="off" />
+        <input id="r-receipt" className={input} value={receiptId} onChange={(e) => setReceiptId(e.target.value)} maxLength={128} placeholder="rcpt_..." autoComplete="off" disabled={!enabled} />
       </div>
       <div>
         <label className={label} htmlFor="r-reason">Reason</label>
-        <textarea id="r-reason" className={input} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Why this refund (kept in the ledger)" />
+        <textarea id="r-reason" className={input} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Why this refund (kept in the ledger)" disabled={!enabled} />
       </div>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       {result && (
@@ -219,14 +226,14 @@ function RefundForm({ onDone }: { onDone: () => Promise<void> }) {
           Refunded {num(result.refunded)} JBux to user {result.userId}{result.revoked ? ", entitlement revoked" : ""}. Balance now {num(result.balance)}.
         </p>
       )}
-      <button type="submit" disabled={busy} className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover disabled:opacity-50 cursor-pointer">
+      <button type="submit" disabled={busy || !enabled} className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover disabled:opacity-50 cursor-pointer">
         {busy ? "..." : "Refund"}
       </button>
     </form>
   );
 }
 
-function HoldForm({ onDone }: { onDone: () => Promise<void> }) {
+function HoldForm({ onDone, enabled }: { onDone: () => Promise<void>; enabled: boolean }) {
   const [userId, setUserId] = useState("");
   const [hold, setHold] = useState<"admin" | "clear">("admin");
   const [reason, setReason] = useState("");
@@ -236,6 +243,7 @@ function HoldForm({ onDone }: { onDone: () => Promise<void> }) {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!enabled) { setError(NOT_LINKED); return; }
     setError("");
     setResult(null);
     const id = userId.trim();
@@ -260,22 +268,23 @@ function HoldForm({ onDone }: { onDone: () => Promise<void> }) {
   };
 
   return (
-    <form onSubmit={submit} className="bg-surface border border-border rounded-xl p-4 space-y-3" aria-labelledby="hold-h">
+    <form onSubmit={submit} className={`bg-surface border border-border rounded-xl p-4 space-y-3 ${enabled ? "" : "opacity-60"}`} aria-labelledby="hold-h">
       <h2 id="hold-h" className="text-base text-text font-semibold">Wallet hold</h2>
+      {!enabled && <p className="text-xs text-text-subtle">Disabled: money actions need the portal link.</p>}
       <div>
         <label className={label} htmlFor="h-user">User id</label>
-        <input id="h-user" className={input} value={userId} onChange={(e) => setUserId(e.target.value)} maxLength={24} placeholder="24-hex portal user id" autoComplete="off" />
+        <input id="h-user" className={input} value={userId} onChange={(e) => setUserId(e.target.value)} maxLength={24} placeholder="24-hex portal user id" autoComplete="off" disabled={!enabled} />
       </div>
       <div>
         <label className={label} htmlFor="h-hold">Hold</label>
-        <select id="h-hold" className={input} value={hold} onChange={(e) => setHold(e.target.value as "admin" | "clear")}>
+        <select id="h-hold" className={input} value={hold} onChange={(e) => setHold(e.target.value as "admin" | "clear")} disabled={!enabled}>
           <option value="admin">On: put the wallet on hold (admin)</option>
           <option value="clear">Off: clear the hold</option>
         </select>
       </div>
       <div>
         <label className={label} htmlFor="h-reason">Reason</label>
-        <textarea id="h-reason" className={input} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Why (kept with the wallet)" />
+        <textarea id="h-reason" className={input} rows={2} value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Why (kept with the wallet)" disabled={!enabled} />
       </div>
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       {result && (
@@ -283,7 +292,7 @@ function HoldForm({ onDone }: { onDone: () => Promise<void> }) {
           Hold is now {result.hold ?? "cleared"}. Balance {num(result.balance)} (real {num(result.funds?.real)}, test {num(result.funds?.test)}, promo {num(result.funds?.promo)}).
         </p>
       )}
-      <button type="submit" disabled={busy} className={`px-3 py-1.5 text-sm rounded-md disabled:opacity-50 cursor-pointer ${hold === "admin" ? "border border-notice text-notice hover:bg-notice/10" : "font-semibold bg-accent text-accent-ink hover:bg-accent-hover"}`}>
+      <button type="submit" disabled={busy || !enabled} className={`px-3 py-1.5 text-sm rounded-md disabled:opacity-50 cursor-pointer ${hold === "admin" ? "border border-notice text-notice hover:bg-notice/10" : "font-semibold bg-accent text-accent-ink hover:bg-accent-hover"}`}>
         {busy ? "..." : hold === "admin" ? "Put on hold" : "Clear hold"}
       </button>
     </form>

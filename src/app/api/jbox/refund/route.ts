@@ -1,6 +1,11 @@
 /**
  * POST /api/jbox/refund { receiptId, reason } -> portal POST /api/admin/jbox/refund (an admin refund).
  * Admin gate + same-origin JSON; the portal validates the receipt and does the money.
+ *
+ * THIS STAYS A PORTAL CALL ON PURPOSE. adminRefund (jx-portal src/lib/wallet.ts) is a money rule of the ledger:
+ * it restores the exact split to the pots it came from and revokes the entitlement the receipt bought. Those rules
+ * must have ONE implementation, the portal's; the console never writes wallets or credit_transactions. Without the
+ * portal link (JX_PORTAL_URL + JX_ADMIN_API_TOKEN) this answers 503 portal-not-linked and the form is disabled.
  */
 import type { NextRequest } from "next/server";
 import { requireAdminApi, jsonError } from "@/lib/require-admin";

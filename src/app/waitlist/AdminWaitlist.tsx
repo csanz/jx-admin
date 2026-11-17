@@ -3,7 +3,7 @@
 /**
  * THE PORTAL WAITLIST, ported from the portal's /admin (src/app/admin/AdminWaitlist.tsx) with the same look. The
  * data and the actions go to this app's /api/waitlist, which reads and writes the platform database directly
- * (src/lib/repo/waitlist.ts) as the signed-in admin. The per-row email status comes from the users rows
+ * (the waitlist repo module) as the signed-in admin. The per-row email status comes from the users rows
  * (waitlistEmails) and the approval notice from the console's own send.
  */
 import { useCallback, useEffect, useState } from "react";

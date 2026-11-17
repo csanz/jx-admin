@@ -1,6 +1,10 @@
 /**
  * POST /api/jbox/hold { userId, hold: "admin" | null, reason } -> portal POST /api/admin/jbox/hold
  * (put a wallet on hold, or clear the hold). Admin gate + same-origin JSON.
+ *
+ * THIS STAYS A PORTAL CALL ON PURPOSE. setHold (jx-portal src/lib/wallet.ts) is a money rule of the ledger (a hold
+ * blocks every spend; clearing it also clears a Stripe dispute hold, with a reason). One implementation, the
+ * portal's; the console never writes wallets. Without the portal link this answers 503 portal-not-linked.
  */
 import type { NextRequest } from "next/server";
 import { requireAdminApi, jsonError } from "@/lib/require-admin";

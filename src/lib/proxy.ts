@@ -1,9 +1,11 @@
 /**
  * The route handlers' shared proxy step: a bounded JSON body (writes) and the portal call with the actor set to the
- * session email. The browser only ever talks to this app; this app talks to the portal with the service token.
+ * session email. Only the two MONEY actions (JBux refund, wallet hold) still go to the portal: adminRefund and
+ * setHold are the ledger's money rules (splits, pots, entitlement revocation) and have one implementation, the
+ * portal's. Without JX_PORTAL_URL + JX_ADMIN_API_TOKEN they answer 503 portal-not-linked.
  */
 import { NextResponse, type NextRequest } from "next/server";
-import { portalAdminFetch } from "./portal.ts";
+import { PORTAL_NOT_LINKED_MESSAGE, PortalNotLinkedError, portalAdminFetch } from "./portal.ts";
 import { jsonError } from "./require-admin.ts";
 
 /** Biggest body a console write accepts: every admin body is a few short fields. */
@@ -24,7 +26,13 @@ export async function readJsonBody(req: NextRequest): Promise<{ ok: true; body: 
 
 /** The portal's answer (status and JSON, already mapped for 401/403/5xx/timeouts) as this app's response. */
 export async function proxyToPortal(path: string, opts: { method?: "GET" | "POST"; body?: unknown; actor: string }): Promise<NextResponse> {
-  const r = await portalAdminFetch(path, opts);
+  let r;
+  try {
+    r = await portalAdminFetch(path, opts);
+  } catch (e) {
+    if (e instanceof PortalNotLinkedError) return jsonError("portal-not-linked", 503, PORTAL_NOT_LINKED_MESSAGE);
+    throw e;
+  }
   if (r.mapped) console.warn(`[jx-admin] portal ${opts.method ?? "GET"} ${path.split("?")[0]} -> ${r.status} (${(r.body as { error?: string })?.error ?? "mapped"})`);
   return NextResponse.json(r.body ?? {}, { status: r.status, headers: { "Cache-Control": "no-store" } });
 }

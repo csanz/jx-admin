@@ -2,6 +2,7 @@
   "name": "jx-admin",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Jazaix admin console (admin.jazaix.com): a standalone Next.js app in front of the portal's admin API.",
   "scripts": {
     "dev": "next dev --webpack --hostname 127.0.0.1 --port 3400",

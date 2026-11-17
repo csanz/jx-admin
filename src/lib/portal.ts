@@ -114,13 +114,27 @@ export function createPortalClient(cfg: PortalClientConfig) {
 
 export type PortalAdminFetch = ReturnType<typeof createPortalClient>;
 
+/** Thrown when a money action is asked for without JX_PORTAL_URL + JX_ADMIN_API_TOKEN. */
+export class PortalNotLinkedError extends Error {
+  constructor() {
+    super("Money actions need the portal link: set JX_PORTAL_URL and JX_ADMIN_API_TOKEN.");
+    this.name = "PortalNotLinkedError";
+  }
+}
+
+export const PORTAL_NOT_LINKED_MESSAGE = "Money actions need the portal link (JX_PORTAL_URL + JX_ADMIN_API_TOKEN).";
+
 let cached: { key: string; client: PortalAdminFetch } | null = null;
 
-/** The configured client (JX_PORTAL_URL + JX_ADMIN_API_TOKEN), built per config, never at import time. */
+/**
+ * The configured client (JX_PORTAL_URL + JX_ADMIN_API_TOKEN), built per config, never at import time. The link is
+ * optional: only the two money actions (refund, hold) use it, so this throws PortalNotLinkedError when it is unset.
+ */
 export function portalClient(): PortalAdminFetch {
   const env = readEnv();
-  const key = `${env.portalUrl}\n${env.adminApiToken}`;
-  if (!cached || cached.key !== key) cached = { key, client: createPortalClient({ baseUrl: env.portalUrl, token: env.adminApiToken }) };
+  if (!env.portal) throw new PortalNotLinkedError();
+  const key = `${env.portal.url}\n${env.portal.token}`;
+  if (!cached || cached.key !== key) cached = { key, client: createPortalClient({ baseUrl: env.portal.url, token: env.portal.token }) };
   return cached.client;
 }
 

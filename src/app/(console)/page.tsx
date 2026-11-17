@@ -59,7 +59,7 @@ export default function OverviewPage() {
         <section className="mt-8">
           <div className="flex items-baseline justify-between gap-2 mb-2">
             <h2 className="text-lg text-text font-semibold">Recent admin actions</h2>
-            <Link href="/audit" className="text-xs text-accent hover:text-accent-hover">All admin actions</Link>
+            <Link href="/audit" className="text-xs text-admin hover:text-admin-hover">All admin actions</Link>
           </div>
           {recent.ok ? <AuditTable rows={recent.value} empty="No admin actions recorded yet." /> : <LoadError what="the admin actions" message={recent.message} />}
         </section>

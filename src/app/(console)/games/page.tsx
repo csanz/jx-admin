@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { gatedPage } from "@/components/AdminGate";
 import { LoadError } from "@/components/LoadError";
-import { BODY_ROW, HEAD_ROW, MoreLink, TableFrame, TD, TH, qs } from "@/components/ListBits";
+import { BODY_ROW, Clip, HEAD_ROW, MoreLink, TableFrame, TD, TH, qs } from "@/components/ListBits";
 import { PageHeader } from "@/components/PageHeader";
-import { num, when } from "@/lib/format";
+import { num, shortWhen } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage } from "@/lib/page-load";
 import { GAME_QUERY_MAX, listGames, type GameSort } from "@/lib/repo/games";
@@ -36,10 +36,10 @@ export default function GamesPage({ searchParams }: { searchParams: SP }) {
             placeholder="Search slug, name or creator"
             maxLength={GAME_QUERY_MAX}
             aria-label="Search games"
-            className="w-full sm:w-96 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-accent"
+            className="w-full sm:w-96 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-admin"
           />
           {sort !== "updated" && <input type="hidden" name="sort" value={sort} />}
-          <button type="submit" className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover cursor-pointer">
+          <button type="submit" className="px-3 py-1.5 text-sm font-semibold bg-admin text-admin-ink rounded-md hover:bg-admin-hover cursor-pointer">
             Search
           </button>
           {q && (
@@ -59,7 +59,7 @@ export default function GamesPage({ searchParams }: { searchParams: SP }) {
             <span key={s}>
               {i > 0 && <span aria-hidden="true"> · </span>}
               {s === sort ? (
-                <span className="text-accent" aria-current="true">{SORT_LABEL[s]}</span>
+                <span className="text-admin" aria-current="true">{SORT_LABEL[s]}</span>
               ) : (
                 <Link href={`/games${qs({ q, sort: sortParam(s) })}`} className="text-text-muted hover:text-text">
                   {SORT_LABEL[s]}
@@ -75,7 +75,7 @@ export default function GamesPage({ searchParams }: { searchParams: SP }) {
             <TableFrame>
               <thead>
                 <tr className={HEAD_ROW}>
-                  <th className={TH}>Game</th>
+                  <th className={`${TH} w-[34%]`}>Game</th>
                   <th className={TH}>Creator</th>
                   <th className={TH}>Access</th>
                   <th className={`${TH} text-right`}>Plays</th>
@@ -92,17 +92,17 @@ export default function GamesPage({ searchParams }: { searchParams: SP }) {
                 {r.value.rows.map((g) => (
                   <tr key={g.id} className={BODY_ROW}>
                     <td className={TD}>
-                      <Link href={`/games/${encodeURIComponent(g.slug)}`} className="text-text hover:text-accent no-underline">
+                      <Link href={`/games/${encodeURIComponent(g.slug)}`} className="text-text hover:text-admin no-underline">
                         {g.emoji && <span className="mr-2" aria-hidden="true">{g.emoji}</span>}
                         {g.name || g.slug}
                       </Link>
                       <p className="text-xs text-text-subtle font-mono">{g.slug}</p>
                     </td>
-                    <td className={`${TD} text-text-muted`}>{g.creator || "n/a"}</td>
+                    <td className={`${TD} text-text-muted`}><Clip text={g.creator || "n/a"} /></td>
                     <td className={`${TD} text-text-muted`}>{g.access || "n/a"}</td>
                     <td className={`${TD} text-right tabular-nums`}>{num(g.plays)}</td>
                     <td className={`${TD} text-right tabular-nums`}>{num(g.rounds)}</td>
-                    <td className={`${TD} text-text-muted whitespace-nowrap`}>{when(g.updatedAt)}</td>
+                    <td className={`${TD} text-xs text-text-muted`}>{shortWhen(g.updatedAt)}</td>
                   </tr>
                 ))}
               </tbody>

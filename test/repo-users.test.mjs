@@ -77,7 +77,7 @@ test("userView maps the portal's row the portal's way", () => {
     waitlistEmails: { joined: { at, status: "sent", id: "e1" } }, signupAs: "both",
   });
   assert.deepEqual(v, {
-    id: _id.toString(), email: "p@x.io", name: "Pat Example", username: "pat", image: "https://img", role: "player", access: "waitlist",
+    id: _id.toString(), email: "p@x.io", name: "Pat Example", username: "pat", image: "https://img", imageSmall: "", role: "player", access: "waitlist",
     createdAt: at.toISOString(), lastLoginAt: null, waitlistedAt: at.toISOString(), approvedAt: null, approvedBy: null,
     emails: { joined: "sent", approved: null }, signupAs: "both",
   });

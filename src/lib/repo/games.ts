@@ -1,6 +1,6 @@
 /**
  * GAMES, read only, straight from the platform database: the portal's `games` collection and what hangs off a game
- * (`game_keys`, `game_join_requests`, `rooms`). Nothing here writes.
+ * (`game_keys`, `game_join_requests`; its rooms are in repo/rooms.ts). Nothing here writes.
  *
  * KEY VALUES NEVER LEAVE THE DATABASE: the keys query projects only label, createdAt, environment and status, and
  * gameKeyView copies only those fields, so even a store that ignored the projection could not leak `key` (or its
@@ -9,10 +9,9 @@
  */
 import { ObjectId, type Db, type Document, type Filter } from "mongodb";
 import { PAGE_SIZE, pageLimit, paged, parsePage, type Paged } from "./paging.ts";
-import { displayValue, idString, isoOrNull, numberOr0, regexEscape, stringOr } from "./values.ts";
+import { idString, isoOrNull, numberOr0, regexEscape, stringOr } from "./values.ts";
 
 export const GAME_QUERY_MAX = 80;
-export const GAME_ROOMS_LIMIT = 20;
 export const GAME_JOIN_REQUESTS_LIMIT = 50;
 export const GAME_KEYS_LIMIT = 50;
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
@@ -144,21 +143,10 @@ export function gameKeyView(doc: Document): GameKeyView {
 
 export type JoinRequestView = { id: string; userId: string; email: string | null; status: string; createdAt: string | null; decidedAt: string | null; decidedBy: string | null };
 
-/** A room as stored, with the fields the rooms table shows (each as a display string; "" when absent). */
-export const ROOM_FIELDS = ["room_id", "name", "state", "phase", "players", "watchers", "max_players", "round", "has_worker", "test", "plugin", "created_at", "closed_at", "updatedAt"] as const;
-export type RoomView = { id: string } & Record<(typeof ROOM_FIELDS)[number], string>;
-
-export function roomView(doc: Document): RoomView {
-  const out = { id: displayValue(doc._id) } as RoomView;
-  for (const f of ROOM_FIELDS) out[f] = displayValue(doc[f]);
-  return out;
-}
-
 export type GameDetail = {
   game: GameView;
   keys: { count: number; items: GameKeyView[] };
   joinRequests: { count: number; items: JoinRequestView[] };
-  rooms: RoomView[];
 };
 
 /** The game with this slug and what hangs off it, or null when there is none. */
@@ -167,17 +155,15 @@ export async function getGameDetail(db: Db, slug: unknown): Promise<GameDetail |
   const doc = await db.collection("games").findOne({ slug });
   if (!doc) return null;
   const idHex = idString(doc._id) ?? "";
-  // game_keys carry the game's ObjectId and its slug; join requests carry the id as a hex string; rooms carry the
-  // slug (game_slug, or game_id on rooms that never got a game_slug).
+  // game_keys carry the game's ObjectId and its slug; join requests carry the id as a hex string.
+  // Rooms are paged separately (repo/rooms.ts listRooms with the game's slug).
   const keyFilter: Filter<Document> = { $or: [{ game_id: doc._id }, { game_slug: slug }] };
   const joinFilter: Filter<Document> = { gameId: { $in: [idHex, doc._id] } };
-  const roomFilter: Filter<Document> = { $or: [{ game_slug: slug }, { game_id: slug }] };
-  const [keyCount, keyDocs, joinCount, joinDocs, roomDocs] = await Promise.all([
+  const [keyCount, keyDocs, joinCount, joinDocs] = await Promise.all([
     db.collection("game_keys").countDocuments(keyFilter),
     db.collection("game_keys").find(keyFilter, { projection: KEY_PROJECTION }).sort({ createdAt: -1, _id: -1 }).limit(GAME_KEYS_LIMIT).toArray(),
     db.collection("game_join_requests").countDocuments(joinFilter),
     db.collection("game_join_requests").find(joinFilter).sort({ createdAt: -1, _id: -1 }).limit(GAME_JOIN_REQUESTS_LIMIT).toArray(),
-    db.collection("rooms").find(roomFilter).sort({ updatedAt: -1, _id: -1 }).limit(GAME_ROOMS_LIMIT).toArray(),
   ]);
   const emails = await emailsFor(db, joinDocs.flatMap((r) => [idString(r.userId), idString(r.decidedBy)]));
   const joinRequests = joinDocs.map((r) => {
@@ -197,7 +183,6 @@ export async function getGameDetail(db: Db, slug: unknown): Promise<GameDetail |
     game: gameView(doc),
     keys: { count: keyCount, items: keyDocs.map(gameKeyView) },
     joinRequests: { count: joinCount, items: joinRequests },
-    rooms: roomDocs.map(roomView),
   };
 }
 

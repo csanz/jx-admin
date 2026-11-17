@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { gatedPage } from "@/components/AdminGate";
+import { PlayerIdLink } from "@/components/DetailBits";
 import { LoadError } from "@/components/LoadError";
-import { BODY_ROW, HEAD_ROW, TableFrame, TD, TH } from "@/components/ListBits";
+import { BODY_ROW, HEAD_ROW, Pager, TableFrame, TD, TH, qs } from "@/components/ListBits";
+import { RoomsTable } from "@/components/RoomsTable";
 import { PageHeader } from "@/components/PageHeader";
-import { num, when } from "@/lib/format";
+import { num, shortWhen, when } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage } from "@/lib/page-load";
-import { GAME_ROOMS_LIMIT, ROOM_FIELDS, getGameDetail } from "@/lib/repo/games";
+import { getGameDetail } from "@/lib/repo/games";
+import { listRooms } from "@/lib/repo/rooms";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Game" };
@@ -36,10 +39,12 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 const dash = (s: string) => s || "n/a";
 
 /** One game, read only: its fields and counters, its keys (count, label, created; never a key value), its join
- * requests and its last 20 rooms. */
-export default function GamePage({ params }: { params: Promise<{ slug: string }> }) {
+ * requests and its rooms (25 a page, ?page=n, each room opens its own page). */
+export default function GamePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   return gatedPage(async () => {
     const { slug: raw } = await params;
+    const sp = await searchParams;
+    const pageParam = Array.isArray(sp.page) ? sp.page[0] : sp.page;
     let slug = raw;
     try {
       slug = decodeURIComponent(raw);
@@ -61,12 +66,13 @@ export default function GamePage({ params }: { params: Promise<{ slug: string }>
           <PageHeader path={`/games/${raw}`} title="Game not found" />
           <p className="text-sm text-text-muted">
             No game has the slug <span className="font-mono">{slug}</span>.{" "}
-            <Link href="/games" className="text-accent hover:text-accent-hover">Back to the games</Link>
+            <Link href="/games" className="text-admin hover:text-admin-hover">Back to the games</Link>
           </p>
         </>
       );
     }
-    const { game: g, keys, joinRequests, rooms } = r.value;
+    const { game: g, keys, joinRequests } = r.value;
+    const rooms = await loadForPage("game rooms", async () => listRooms(await mongoDb(), { game: g.slug, page: pageParam }));
     const c = g.counters;
     return (
       <>
@@ -87,10 +93,10 @@ export default function GamePage({ params }: { params: Promise<{ slug: string }>
             <Field label="Access">{dash(g.access)}</Field>
             <Field label="Tags">{g.tags.length ? g.tags.join(", ") : "none"}</Field>
             <Field label="Client URL">
-              {g.clientUrl ? <a href={g.clientUrl} target="_blank" rel="noreferrer" className="text-accent hover:text-accent-hover break-all">{g.clientUrl}</a> : "n/a"}
+              {g.clientUrl ? <a href={g.clientUrl} target="_blank" rel="noreferrer" className="text-admin hover:text-admin-hover break-all">{g.clientUrl}</a> : "n/a"}
             </Field>
             <Field label="Discord URL">
-              {g.discordUrl ? <a href={g.discordUrl} target="_blank" rel="noreferrer" className="text-accent hover:text-accent-hover break-all">{g.discordUrl}</a> : "n/a"}
+              {g.discordUrl ? <a href={g.discordUrl} target="_blank" rel="noreferrer" className="text-admin hover:text-admin-hover break-all">{g.discordUrl}</a> : "n/a"}
             </Field>
             <Field label="Studio enabled">{g.studioEnabled ? "yes" : "no"}</Field>
             <Field label="Created">{when(g.createdAt)}</Field>
@@ -134,7 +140,7 @@ export default function GamePage({ params }: { params: Promise<{ slug: string }>
                     <td className={TD}>{dash(k.label)}</td>
                     <td className={`${TD} text-text-muted`}>{dash(k.environment)}</td>
                     <td className={`${TD} text-text-muted`}>{dash(k.status)}</td>
-                    <td className={`${TD} text-text-muted whitespace-nowrap`}>{when(k.createdAt)}</td>
+                    <td className={`${TD} text-text-muted `}>{shortWhen(k.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -161,11 +167,11 @@ export default function GamePage({ params }: { params: Promise<{ slug: string }>
                   <tr key={j.id} className={BODY_ROW}>
                     <td className={TD}>
                       {j.email ?? "unknown user"}
-                      <span className="block text-[11px] text-text-subtle font-mono">{j.userId}</span>
+                      <PlayerIdLink id={j.userId} />
                     </td>
                     <td className={`${TD} ${j.status === "pending" ? "text-notice" : "text-text-muted"}`}>{dash(j.status)}</td>
-                    <td className={`${TD} text-text-muted whitespace-nowrap`}>{when(j.createdAt)}</td>
-                    <td className={`${TD} text-text-muted whitespace-nowrap`}>{when(j.decidedAt)}</td>
+                    <td className={`${TD} text-text-muted `}>{shortWhen(j.createdAt)}</td>
+                    <td className={`${TD} text-text-muted `}>{shortWhen(j.decidedAt)}</td>
                     <td className={`${TD} text-text-muted`}>{j.decidedBy ?? "n/a"}</td>
                   </tr>
                 ))}
@@ -174,28 +180,25 @@ export default function GamePage({ params }: { params: Promise<{ slug: string }>
           )}
         </Section>
 
-        <Section title="Rooms" note={`the last ${GAME_ROOMS_LIMIT}, most recently updated first`}>
-          {rooms.length === 0 ? (
+        <Section title="Rooms" note={rooms.ok ? `${num(rooms.value.total)} in all, most recently updated first` : undefined}>
+          {!rooms.ok ? (
+            <LoadError what="the rooms" message={rooms.message} />
+          ) : rooms.value.rows.length === 0 ? (
             <p className="text-sm text-text-subtle">No rooms.</p>
           ) : (
-            <TableFrame>
-              <thead>
-                <tr className={HEAD_ROW}>
-                  {ROOM_FIELDS.map((f) => (
-                    <th key={f} className={`${TH} font-mono normal-case tracking-normal`}>{f}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rooms.map((room) => (
-                  <tr key={room.id} className={BODY_ROW}>
-                    {ROOM_FIELDS.map((f) => (
-                      <td key={f} className={`${TD} text-text-muted whitespace-nowrap text-xs`}>{room[f]}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </TableFrame>
+            <>
+              <RoomsTable rows={rooms.value.rows} />
+              <Pager
+                page={rooms.value.page}
+                pageCount={rooms.value.pageCount}
+                total={rooms.value.total}
+                noun="rooms"
+                hrefFor={(p) => `/games/${encodeURIComponent(g.slug)}${qs({ page: p })}`}
+              />
+              <p className="mt-1 text-xs text-text-subtle">
+                <Link href={`/games/rooms${qs({ game: g.slug })}`} className="text-admin hover:text-admin-hover">All rooms of this game with filters</Link>
+              </p>
+            </>
           )}
         </Section>
       </>

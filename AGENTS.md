@@ -30,8 +30,8 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
    Exceptions, by name: `/api/auth/*` and `/api/health`. Non-admins see "Not an admin".
 3. Data: the official `mongodb` driver, one cached client in `src/lib/mongo.ts` (globalThis, serverless-safe,
    `serverSelectionTimeoutMS` 5000, never created at import time), env `MONGODB_URI` + `MONGODB_DB` (default
-   `jx_portal`). EVERY read and write lives in `src/lib/repo/*.ts` (users, waitlist, jbux-report, audit, games,
-   catalog, plus the paging and values helpers): plain
+   `jx_portal`). EVERY read and write lives in `src/lib/repo/*.ts` (users, user-detail, waitlist, jbux-report, audit,
+   games, rooms, catalog, plus the paging and values helpers): plain
    modules that take a `Db`, no framework imports, no `process.env`, so node tests them directly. The fields written
    are the portal's (access, approvedAt, approvedBy, waitlistedAt, waitlistEmails, role), so the portal keeps working
    against the same rows. Every write appends an `admin_actions` document
@@ -57,8 +57,17 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
    unreachable database into a visible message); a client component only where interaction needs it. Lists page at
    50 (`src/lib/repo/paging.ts`) with a "more" control. `test/shell-layout.test.mjs` pins the tree, the group, the
    gate, the README routes and the `/waitlist` redirect. Add the route to the README "Navigation" table.
-9. Games, catalog and audit are read only. `game_keys` is read with a projection of label, environment, status and
+9. Games, rooms, catalog and audit are read only. `game_keys` is read with a projection of label, environment, status and
    createdAt only: a key value (or its prefix) never leaves the database (`test/repo-games.test.mjs`).
+10. Theme and layout (owner 2026-11-17): the colour and font tokens in `src/app/globals.css` are the portal's,
+   verbatim (a test compares them with jx-portal's file). The admin accent is `--color-admin` (= the notice orange):
+   use `text-admin` / `bg-admin` / `bg-admin-hover` / `text-admin-ink` for primary buttons, links, the active item and
+   focus; never the green `*-accent` classes (green `text-success` is for success / approved states only). The
+   lockup is `src/components/Brand.tsx`. The sidebar logo row and the page header crumb row share `h-header`.
+   Tables: `TableFrame` (fixed layout, full width) with `Clip` / wrapping cells and short dates; NO
+   `overflow-x-auto` / `overflow-auto` anywhere (test/avatar-theme-layout.test.mjs). User pictures render only
+   through `<Avatar>` (onError falls back to the initial). Server-paged lists use `numberedPage` + `<Pager>`
+   (previous / next, page n of m).
 
 ## Checks before a push
 ```

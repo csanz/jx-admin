@@ -17,7 +17,13 @@ export const NAV: NavSection[] = [
       { label: "Waitlist", href: "/users/waitlist" },
     ],
   },
-  { label: "Games", items: [{ label: "List", href: "/games" }] },
+  {
+    label: "Games",
+    items: [
+      { label: "List", href: "/games" },
+      { label: "Rooms", href: "/games/rooms" },
+    ],
+  },
   { label: "Assets", items: [{ label: "Catalog", href: "/assets/catalog" }] },
   { label: "JBux", items: [{ label: "Report", href: "/jbux" }] },
   { label: "Audit", items: [{ label: "Admin actions", href: "/audit" }] },

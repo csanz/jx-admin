@@ -21,6 +21,24 @@ export function catalogRow(doc: Document): CatalogRow {
   return { id: idString(doc._id) ?? displayValue(doc._id), fields };
 }
 
+/** The columns the catalog table shows (owner 2026-11-17: fit the pane); every other field goes in the row's tooltip. */
+export const CATALOG_TABLE_COLUMNS = [
+  ["sku", "sku"],
+  ["name", "name"],
+  ["kind", "kind"],
+  ["gameId", "game"],
+  ["priceCredits", "price"],
+  ["enabled", "enabled"],
+  ["cosmetic", "cosmetic"],
+  ["createdAt", "created"],
+] as const;
+
+/** Pure: the fields of a row that the table does not show, as "name: value" lines (for the tooltip). */
+export function catalogExtraLines(row: CatalogRow): string[] {
+  const shown = new Set<string>(CATALOG_TABLE_COLUMNS.map(([f]) => f));
+  return Object.entries(row.fields).filter(([k]) => !shown.has(k)).map(([k, v]) => `${k}: ${v}`);
+}
+
 /** Pure: the columns for a set of rows, the known fields first (only those present), then the rest sorted. */
 export function catalogColumns(rows: CatalogRow[]): string[] {
   const present = new Set(rows.flatMap((r) => Object.keys(r.fields)));

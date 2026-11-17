@@ -34,20 +34,20 @@ export default function AuditPage({ searchParams }: { searchParams: SP }) {
             placeholder="Actor email"
             maxLength={AUDIT_ACTOR_MAX}
             aria-label="Filter by actor"
-            className="w-full sm:w-72 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-accent"
+            className="w-full sm:w-72 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-admin"
           />
           <select
             name="action"
             defaultValue={action}
             aria-label="Filter by action"
-            className="px-2 py-1.5 text-sm bg-surface border border-border rounded-md text-text focus:outline-none focus:border-accent"
+            className="px-2 py-1.5 text-sm bg-surface border border-border rounded-md text-text focus:outline-none focus:border-admin"
           >
             <option value="">every action</option>
             {AUDIT_ACTIONS.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>
-          <button type="submit" className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover cursor-pointer">
+          <button type="submit" className="px-3 py-1.5 text-sm font-semibold bg-admin text-admin-ink rounded-md hover:bg-admin-hover cursor-pointer">
             Filter
           </button>
           {filtered && <Link href="/audit" className="text-xs text-text-subtle hover:text-text">Clear</Link>}

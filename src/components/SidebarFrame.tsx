@@ -9,6 +9,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { NAV, OVERVIEW, activeHref } from "@/lib/nav";
+import { Brand } from "./Brand";
 
 export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; footer: ReactNode; children: ReactNode }) {
   const pathname = usePathname() ?? "/";
@@ -28,13 +29,13 @@ export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; 
 
   const linkClass = (href: string, indent: boolean) =>
     `block rounded-md py-1.5 ${indent ? "pl-6 pr-3" : "px-3"} text-sm no-underline ${
-      active === href ? "bg-surface-light text-accent" : "text-text-muted hover:text-text hover:bg-surface-light/60"
+      active === href ? "bg-surface-light text-admin" : "text-text-muted hover:text-text hover:bg-surface-light/60"
     }`;
 
   return (
     <div className="min-h-screen">
       {/* Under 900 px: a slim strip with the menu button and the mark. */}
-      <div className="min-[900px]:hidden sticky top-0 z-30 h-12 px-4 flex items-center gap-3 bg-bg/95 backdrop-blur-sm border-b border-border-subtle">
+      <div className="min-[900px]:hidden sticky top-0 z-30 h-header px-4 flex items-center gap-3 bg-bg/95 backdrop-blur-sm border-b border-border-subtle">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -56,7 +57,7 @@ export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; 
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="h-12 px-4 flex items-center justify-between border-b border-border-subtle shrink-0">
+        <div className="h-header px-4 flex items-center justify-between border-b border-border-subtle shrink-0">
           <Brand />
           <button type="button" onClick={() => setOpen(false)} aria-label="Close the menu" className="min-[900px]:hidden px-2 py-1 text-xs text-text-subtle hover:text-text cursor-pointer">
             Close
@@ -103,17 +104,10 @@ export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; 
       </aside>
 
       <main className="min-[900px]:pl-60">
-        <div className="px-4 py-6 sm:px-8 max-w-6xl">{children}</div>
+        {/* No top padding: every page starts with PageHeader, whose crumb row is the same header band as the
+            sidebar's logo row (h-header, centred), so the logo and the crumb share one line. */}
+        <div className="px-4 pb-10 sm:px-8 min-w-0">{children}</div>
       </main>
     </div>
-  );
-}
-
-function Brand() {
-  return (
-    <Link href="/" className="flex items-baseline gap-2 no-underline">
-      <span className="font-sans font-bold text-text tracking-tight text-[17px]">Jazaix</span>
-      <span className="text-[11px] uppercase tracking-[0.16em] text-accent">Admin</span>
-    </Link>
   );
 }

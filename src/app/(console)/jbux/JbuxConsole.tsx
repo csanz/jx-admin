@@ -9,7 +9,7 @@
  * Response shapes follow the portal's JboxReport (src/lib/wallet-admin.ts) and the two write routes.
  */
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { errorText, num, when } from "@/lib/format";
+import { errorText, num, shortWhen } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 
 const FUNDINGS = ["real", "test", "promo"] as const;
@@ -28,10 +28,10 @@ type Funds = { real: number; test: number; promo: number };
 type RefundResult = { refunded: number; split: Partial<Funds>; revoked: boolean; userId: string; balance: number; funds: Funds };
 type HoldResult = { hold: string | null; balance: number; funds: Funds };
 
-const input = "w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-accent";
+const input = "w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-admin";
 const label = "block text-[11px] uppercase tracking-[0.12em] text-text-subtle mb-1";
 const th = "px-3 py-2 font-normal text-[11px] uppercase tracking-[0.12em] text-text-subtle";
-const td = "px-3 py-2 whitespace-nowrap";
+const td = "px-3 py-2 break-words [overflow-wrap:anywhere]";
 
 async function postJson(path: string, body: unknown): Promise<{ ok: boolean; status: number; body: unknown }> {
   const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -122,8 +122,8 @@ export function JbuxConsole({ portalLinked }: { portalLinked: boolean }) {
               </div>
             </div>
 
-            <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="bg-surface border border-border rounded-xl">
+              <table className="w-full table-fixed text-sm">
                 <thead>
                   <tr className="text-left border-b border-border">
                     <th className={th}>Kind</th><th className={th}>Source</th><th className={`${th} text-right`}>Rows</th>
@@ -144,14 +144,14 @@ export function JbuxConsole({ portalLinked }: { portalLinked: boolean }) {
 
             <details className="bg-surface border border-border rounded-xl">
               <summary className="px-3 py-2 text-sm text-text-muted cursor-pointer">Test buys ({num(report.testBuys.length)}, newest first)</summary>
-              <div className="overflow-x-auto border-t border-border-subtle">
-                <table className="w-full text-sm">
+              <div className="border-t border-border-subtle">
+                <table className="w-full table-fixed text-sm">
                   <thead><tr className="text-left border-b border-border"><th className={th}>When</th><th className={th}>Who</th><th className={`${th} text-right`}>Amount</th><th className={th}>Pack</th><th className={th}>Env</th></tr></thead>
                   <tbody>
                     {report.testBuys.length === 0 && <tr><td colSpan={5} className="px-3 py-4 text-center text-text-subtle">None.</td></tr>}
                     {report.testBuys.map((b, i) => (
                       <tr key={`${b.userId}-${b.at}-${i}`} className="border-b border-border-subtle last:border-0 text-text-muted">
-                        <td className={td}>{when(b.at)}</td>
+                        <td className={td}>{shortWhen(b.at)}</td>
                         <td className={td}><span className="text-text">{b.email ?? "n/a"}</span><span className="block text-[11px] text-text-subtle font-mono">{b.userId}</span></td>
                         <td className={`${td} text-right tabular-nums`}>{num(b.amount)}</td><td className={td}>{b.packId ?? "n/a"}</td><td className={td}>{b.env ?? "n/a"}</td>
                       </tr>
@@ -221,7 +221,7 @@ function RefundForm({ onDone, enabled }: { onDone: () => Promise<void>; enabled:
           Refunded {num(result.refunded)} JBux to user {result.userId}{result.revoked ? ", entitlement revoked" : ""}. Balance now {num(result.balance)}.
         </p>
       )}
-      <button type="submit" disabled={busy || !enabled} className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover disabled:opacity-50 cursor-pointer">
+      <button type="submit" disabled={busy || !enabled} className="px-3 py-1.5 text-sm font-semibold bg-admin text-admin-ink rounded-md hover:bg-admin-hover disabled:opacity-50 cursor-pointer">
         {busy ? "..." : "Refund"}
       </button>
     </form>
@@ -287,7 +287,7 @@ function HoldForm({ onDone, enabled }: { onDone: () => Promise<void>; enabled: b
           Hold is now {result.hold ?? "cleared"}. Balance {num(result.balance)} (real {num(result.funds?.real)}, test {num(result.funds?.test)}, promo {num(result.funds?.promo)}).
         </p>
       )}
-      <button type="submit" disabled={busy || !enabled} className={`px-3 py-1.5 text-sm rounded-md disabled:opacity-50 cursor-pointer ${hold === "admin" ? "border border-notice text-notice hover:bg-notice/10" : "font-semibold bg-accent text-accent-ink hover:bg-accent-hover"}`}>
+      <button type="submit" disabled={busy || !enabled} className={`px-3 py-1.5 text-sm rounded-md disabled:opacity-50 cursor-pointer ${hold === "admin" ? "border border-notice text-notice hover:bg-notice/10" : "font-semibold bg-admin text-admin-ink hover:bg-admin-hover"}`}>
         {busy ? "..." : hold === "admin" ? "Put on hold" : "Clear hold"}
       </button>
     </form>

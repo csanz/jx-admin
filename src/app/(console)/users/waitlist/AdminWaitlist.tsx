@@ -6,8 +6,11 @@
  * (the waitlist repo module) as the signed-in admin. The per-row email status comes from the users rows
  * (waitlistEmails) and the approval notice from the console's own send.
  */
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { errorText, when } from "@/lib/format";
+import { Avatar } from "@/components/Avatar";
+import { avatarSrc } from "@/lib/avatar";
+import { errorText, shortWhen } from "@/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 
 type Status = "waitlist" | "approved";
@@ -25,7 +28,7 @@ function EmailNote({ status }: { status: string | null | undefined }) {
 }
 type Data = { counts: { waiting: number; approved: number }; users: Row[] };
 
-export function AdminWaitlist() {
+export function AdminWaitlist({ portalUrl }: { portalUrl: string | null }) {
   const [status, setStatus] = useState<Status>("waitlist");
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -81,7 +84,7 @@ export function AdminWaitlist() {
       type="button"
       onClick={() => setStatus(s)}
       aria-pressed={status === s}
-      className={`px-3 py-1.5 text-sm rounded-md border transition-colors cursor-pointer ${status === s ? "bg-accent text-accent-ink border-accent" : "bg-surface text-text-muted border-border hover:text-text"}`}
+      className={`px-3 py-1.5 text-sm rounded-md border transition-colors cursor-pointer ${status === s ? "bg-admin text-admin-ink border-admin" : "bg-surface text-text-muted border-border hover:text-text"}`}
     >
       {label}{n !== undefined && <span className="ml-1.5 tabular-nums opacity-80">{n.toLocaleString()}</span>}
     </button>
@@ -100,18 +103,18 @@ export function AdminWaitlist() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search email, name or username"
           maxLength={80}
-          className="ml-auto w-full sm:w-72 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-accent"
+          className="ml-auto w-full sm:w-72 px-3 py-1.5 text-sm bg-surface border border-border rounded-md text-text placeholder:text-text-subtle focus:outline-none focus:border-admin"
         />
       </div>
 
       {error && <p role="alert" className="mb-3 text-sm text-danger">{error}</p>}
       {notice && <p role="status" className="mb-3 text-sm text-text-muted">{notice}</p>}
 
-      <div className="bg-surface border border-border rounded-xl overflow-x-auto">
-        <table className="w-full text-sm">
+      <div className="bg-surface border border-border rounded-xl">
+        <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-text-subtle border-b border-border">
-              <th className="px-4 py-2.5 font-normal">Person</th>
+              <th className="px-4 py-2.5 font-normal w-[45%]">Person</th>
               <th className="px-4 py-2.5 font-normal">{status === "waitlist" ? "Waiting since" : "Approved"}</th>
               <th className="px-4 py-2.5 font-normal">Last sign-in</th>
               <th className="px-4 py-2.5 font-normal text-right">Action</th>
@@ -130,28 +133,25 @@ export function AdminWaitlist() {
               <tr key={u.id} className="border-b border-border-subtle last:border-0">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    {u.image
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={u.image} alt="" className="w-8 h-8 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
-                      : <div className="w-8 h-8 rounded-full shrink-0 bg-bg border border-border" />}
+                    <Avatar src={avatarSrc(u.image, portalUrl)} label={u.name || u.username || u.email} />
                     <div className="min-w-0">
-                      <p className="text-text truncate">{u.name || u.username || "n/a"}{u.role !== "player" && <span className="ml-2 text-[11px] text-accent uppercase">{u.role}</span>}{u.signupAs && <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${u.signupAs !== "gamer" ? "bg-accent/15 text-accent" : "border border-border text-text-muted"}`}>{u.signupAs === "developer" ? "Developer" : u.signupAs === "both" ? "Both" : "Gamer"}</span>}</p>
-                      <p className="text-xs text-text-subtle truncate">{u.email}{u.username && ` · @${u.username}`}</p>
+                      <p className="text-text truncate"><Link href={`/users/${u.id}`} className="text-text hover:text-admin no-underline">{u.name || u.username || "n/a"}</Link>{u.role !== "player" && <span className="ml-2 text-[11px] text-admin uppercase">{u.role}</span>}{u.signupAs && <span className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${u.signupAs !== "gamer" ? "bg-admin/15 text-admin" : "border border-border text-text-muted"}`}>{u.signupAs === "developer" ? "Developer" : u.signupAs === "both" ? "Both" : "Gamer"}</span>}</p>
+                      <p className="text-xs text-text-subtle truncate" title={u.email}>{u.email}{u.username && ` · @${u.username}`}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-text-muted whitespace-nowrap">
+                <td className="px-4 py-3 text-text-muted text-xs break-words">
                   {status === "waitlist"
-                    ? <>{when(u.waitlistedAt ?? u.createdAt)}<EmailNote status={u.emails?.joined} /></>
+                    ? <>{shortWhen(u.waitlistedAt ?? u.createdAt)}<EmailNote status={u.emails?.joined} /></>
                     : u.approvedAt
-                      ? <>{when(u.approvedAt)}{u.approvedBy && <span className="block text-xs text-text-subtle">by {u.approvedBy}</span>}<EmailNote status={u.emails?.approved} /></>
+                      ? <><span className="text-success">{shortWhen(u.approvedAt)}</span>{u.approvedBy && <span className="block text-xs text-text-subtle">by {u.approvedBy}</span>}<EmailNote status={u.emails?.approved} /></>
                       : <span className="text-text-subtle">before the waitlist</span>}
                 </td>
-                <td className="px-4 py-3 text-text-muted whitespace-nowrap">{when(u.lastLoginAt)}</td>
+                <td className="px-4 py-3 text-text-muted text-xs">{shortWhen(u.lastLoginAt)}</td>
                 <td className="px-4 py-3 text-right">
                   {status === "waitlist" ? (
                     <button type="button" disabled={busy === u.id} onClick={() => act(u, "approve")}
-                      className="px-3 py-1.5 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover disabled:opacity-50 cursor-pointer">
+                      className="px-3 py-1.5 text-sm font-semibold bg-admin text-admin-ink rounded-md hover:bg-admin-hover disabled:opacity-50 cursor-pointer">
                       {busy === u.id ? "..." : "Approve"}
                     </button>
                   ) : u.role === "player" ? (

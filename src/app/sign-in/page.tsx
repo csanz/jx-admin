@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { Brand, JxMark } from "@/components/Brand";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { sessionEmail, signIn } from "@/lib/auth";
 
@@ -21,16 +22,13 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   // The only page outside the console shell: a slim strip with the mark and the theme toggle, then the card.
   return (
     <>
-    <div className="h-12 px-4 sm:px-8 flex items-center justify-between border-b border-border-subtle">
-      <span className="flex items-baseline gap-2">
-        <span className="font-sans font-bold text-text tracking-tight text-[17px]">Jazaix</span>
-        <span className="text-[11px] uppercase tracking-[0.16em] text-accent">Admin</span>
-      </span>
+    <div className="h-header px-4 sm:px-8 flex items-center justify-between border-b border-border-subtle">
+      <Brand plain />
       <ThemeToggle initial={theme} />
     </div>
     <section className="max-w-md mx-auto mt-16 bg-surface border border-border rounded-xl p-6">
-      <p className="text-[11px] text-text-subtle uppercase tracking-[0.16em]">Jazaix admin</p>
-      <h1 className="text-2xl text-text font-semibold mt-1">Sign in</h1>
+      <JxMark className="h-10 w-auto text-admin" />
+      <h1 className="text-2xl text-text font-semibold mt-4">Sign in to Jazaix admin</h1>
       <p className="mt-3 text-sm text-text-muted">Admins only. Use the Google account that is on the admin list.</p>
       {errorText && <p role="alert" className="mt-3 text-sm text-danger">{errorText}</p>}
       <form
@@ -40,7 +38,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           await signIn("google", { redirectTo: "/" });
         }}
       >
-        <button type="submit" className="w-full px-3 py-2 text-sm font-semibold bg-accent text-accent-ink rounded-md hover:bg-accent-hover cursor-pointer">
+        <button type="submit" className="w-full px-3 py-2 text-sm font-semibold bg-admin text-admin-ink rounded-md hover:bg-admin-hover cursor-pointer">
           Continue with Google
         </button>
       </form>

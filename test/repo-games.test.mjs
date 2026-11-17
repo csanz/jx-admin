@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId } from "mongodb";
 import { fakeDb } from "./fake-db.mjs";
-import { GAME_ROOMS_LIMIT, gameSearchFilter, gameSortSpec, getGameDetail, listGames, parseGameSort } from "../src/lib/repo/games.ts";
+import { gameSearchFilter, gameSortSpec, getGameDetail, listGames, parseGameSort } from "../src/lib/repo/games.ts";
 import { MAX_PAGES, PAGE_SIZE } from "../src/lib/repo/paging.ts";
 
 const LM = new ObjectId("6ae02121890be921ce8b6e19");
@@ -106,11 +106,8 @@ test("getGameDetail: the game's fields, counters and related rows; unknown or ma
   assert.equal(d.joinRequests.count, 1);
   assert.equal(d.joinRequests.items[0].email, "asker@example.com");
   assert.equal(d.joinRequests.items[0].decidedBy, "owner@jazaix.com");
-  assert.equal(d.rooms.length, GAME_ROOMS_LIMIT);
-  assert.equal(d.rooms[0].room_id, "room29", "most recently updated room first");
-  assert.ok(d.rooms.every((r) => r.id !== "other"), "rooms of other games are not listed");
-  assert.equal(d.rooms[0].players, "29");
-  assert.equal(d.rooms[0].closed_at, "", "an absent field shows empty");
+  assert.equal("rooms" in d, false, "rooms are paged by repo/rooms.ts, not loaded with the game");
+  assert.equal(db.queries.some((q) => q.collection === "rooms"), false);
 
   assert.equal(await getGameDetail(db, "nope"), null);
   assert.equal(await getGameDetail(db, "../etc"), null);

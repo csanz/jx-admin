@@ -1,9 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  /* THE BRAND (owner 2026-11-16): PURE BLACK + GREEN, the portal's tokens copied exactly. Green is the accent (links,
-     primary actions); ORANGE is a secondary mark only (--color-notice, badges and dots), never a primary button.
-     Contrast on black: text 17.9:1, muted 6.2:1, accent 9.2:1; a filled green button takes a BLACK label. */
+  /* THE PRODUCT THEME, copied verbatim from the portal (jx-portal/src/app/globals.css, owner 2026-11-16): pure black +
+     green. test/theme.test.mjs compares every token below with the portal's file, dark and light. */
   --color-bg: #000000;
   --color-surface: #0b0b0c;
   --color-surface-light: #141416;
@@ -21,9 +20,20 @@
   --color-green-border: #3fb950;
   --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* THE ONE ADMIN DIFFERENCE (owner 2026-11-17): the admin accent is the brand's secondary colour, the notice orange,
+     so an admin tab is unmistakable next to the green player portal. It marks the logo, the active sidebar item,
+     focus rings, links and primary buttons. Green (accent / success) stays for success and approved states.
+     On black, #f25a1a is 6.8:1 with a black label; on white, #c2410c is 5.2:1 with a white label. */
+  --color-admin: var(--color-notice);
+  --color-admin-hover: #ff7a3d;
+  --color-admin-ink: #000000;
+
+  /* The shared header band: the sidebar's logo row and every page's crumb row have this height. */
+  --spacing-header: 4rem;
 }
 
-/* Light theme, mirrored from the portal: every text token clears WCAG AA (4.5:1) on both bg and surface. */
+/* Light theme, verbatim from the portal: every text token clears WCAG AA (4.5:1) on both bg and surface. */
 [data-theme="light"] {
   --color-bg: #ffffff;
   --color-surface: #f6f6f7;
@@ -40,6 +50,14 @@
   --color-danger: #b91c1c;
   --color-success: #15803d;
   --color-green-border: #1a7f37;
+  --color-green-300: #15803d; --color-green-400: #15803d;
+  --color-yellow-300: #a16207; --color-yellow-400: #a16207;
+  --color-red-300: #b91c1c; --color-red-400: #b91c1c;
+
+  /* admin accent, light: the light notice */
+  --color-admin: var(--color-notice);
+  --color-admin-hover: #9a3412;
+  --color-admin-ink: #ffffff;
 }
 
 html {
@@ -59,4 +77,20 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-sans);
   letter-spacing: -0.02em;
   line-height: 1.15;
+}
+
+/* Focus rings in the admin colour, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--color-admin);
+  outline-offset: 2px;
+}
+
+/* The Jazaix wordmark (public/brand/jazaix-wordmark.png, cropped from the portal's horizontal logo) drawn as a mask,
+   so it takes the text colour in both themes. */
+.jx-wordmark {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url("/brand/jazaix-wordmark.png") no-repeat center / contain;
+  mask: url("/brand/jazaix-wordmark.png") no-repeat center / contain;
+  aspect-ratio: 313 / 64;
 }

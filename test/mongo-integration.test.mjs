@@ -14,6 +14,7 @@ import { applyWaitlistAction, listWaitlist, waitlistCounts } from "../src/lib/re
 import { getJbuxReport } from "../src/lib/repo/jbux-report.ts";
 import { getGameDetail, listGames } from "../src/lib/repo/games.ts";
 import { listCatalog } from "../src/lib/repo/catalog.ts";
+import { getRoomDetail, listRooms } from "../src/lib/repo/rooms.ts";
 import { listAuditActions } from "../src/lib/repo/audit.ts";
 
 const URI = process.env.JX_TEST_MONGO_URI || "";
@@ -217,7 +218,11 @@ test("games: list, search, sort and one game with keys (no key values), join req
   assert.equal(d.keys.count, 1);
   assert.doesNotMatch(JSON.stringify(d), /INTEGRATION_SECRET|gk_dev_zz/);
   assert.equal(d.joinRequests.items[0].email, "a@example.com");
-  assert.deepEqual(d.rooms.map((r) => r.room_id), ["it-room-1", "it-room-2"]);
+  const rooms = await listRooms(db, { game: "it-game" });
+  assert.deepEqual(rooms.rows.map((r) => r.roomId), ["it-room-1", "it-room-2"]);
+  assert.equal((await listRooms(db, { game: "it-game", state: "closed" })).total, 1);
+  const room = await getRoomDetail(db, "it-room-1");
+  assert.equal(room.row.state, "open");
   assert.equal(await getGameDetail(db, "missing"), null);
 });
 

@@ -1,7 +1,8 @@
 /**
  * A small in-memory stand-in for the mongodb Db the repo modules take: collection(name) with find (filter, sort,
  * skip, limit, toArray; the projection is IGNORED on purpose, so a test proves a repo never relies on it to hide a
- * field), findOne, countDocuments. Filters: equality (ObjectId-aware), $or, $in, $ne, $regex + $options "i".
+ * field), findOne, countDocuments, distinct. Filters: equality (ObjectId-aware), $or, $and, $in, $ne, $exists,
+ * $gte/$gt/$lt/$lte (Date-aware), $regex + $options "i".
  * Every query is recorded in `db.queries` for assertions.
  */
 import { ObjectId } from "mongodb";
@@ -20,6 +21,16 @@ function matchValue(v, cond) {
           if (!arg.some((a) => eq(v, a))) return false;
         } else if (op === "$ne") {
           if (eq(v, arg)) return false;
+        } else if (op === "$exists") {
+          if ((v !== undefined) !== Boolean(arg)) return false;
+        } else if (op === "$gte" || op === "$lt" || op === "$lte" || op === "$gt") {
+          const a = v instanceof Date ? v.getTime() : v;
+          const b = arg instanceof Date ? arg.getTime() : arg;
+          if (a === undefined || a === null) return false;
+          if (op === "$gte" && !(a >= b)) return false;
+          if (op === "$gt" && !(a > b)) return false;
+          if (op === "$lt" && !(a < b)) return false;
+          if (op === "$lte" && !(a <= b)) return false;
         } else throw new Error(`fake-db: unsupported operator ${op}`);
       }
       return true;
@@ -32,6 +43,10 @@ export function matches(doc, filter = {}) {
   for (const [k, cond] of Object.entries(filter)) {
     if (k === "$or") {
       if (!cond.some((f) => matches(doc, f))) return false;
+      continue;
+    }
+    if (k === "$and") {
+      if (!cond.every((f) => matches(doc, f))) return false;
       continue;
     }
     if (!matchValue(doc[k], cond)) return false;
@@ -84,6 +99,12 @@ export function fakeDb(collections = {}) {
           queries.push({ collection: name, op: "findOne", filter, options });
           const d = docs().find((x) => matches(x, filter));
           return d ? { ...d } : null;
+        },
+        async distinct(field, filter = {}) {
+          queries.push({ collection: name, op: "distinct", field, filter });
+          const out = [];
+          for (const d of docs().filter((x) => matches(x, filter))) if (!out.some((o) => eq(o, d[field]))) out.push(d[field] ?? null);
+          return out;
         },
         async countDocuments(filter = {}) {
           queries.push({ collection: name, op: "count", filter });

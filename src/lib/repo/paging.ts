@@ -34,3 +34,41 @@ export function pageLimit(page: number, size = PAGE_SIZE): number {
 export function paged<T>(rows: T[], total: number, page: number): Paged<T> {
   return { rows, total, page, hasMore: rows.length < total && page < MAX_PAGES };
 }
+
+// ── NUMBERED PAGES (previous / next / "page n of m") ───────────────────────────────────────────────────────────────
+
+/** What a numbered list answers: one page of rows, the total, the page shown and how many pages there are. */
+export type NumberedPage<T> = { rows: T[]; total: number; page: number; pageCount: number; pageSize: number };
+
+/** ?page= for a numbered list: 1.. (anything else is 1), never further than MAX_SKIP rows in. */
+export function parsePageNumber(v: unknown, size: number): number {
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d{1,9}$/.test(v.trim()) ? Number(v.trim()) : NaN;
+  if (!Number.isInteger(n) || n < 1) return 1;
+  return Math.min(n, Math.floor(MAX_SKIP / size) + 1);
+}
+
+/** How many pages `total` rows make (at least 1). */
+export function pageCount(total: number, size: number): number {
+  return Math.max(1, Math.ceil(Math.max(0, total) / size));
+}
+
+/** The page actually shown: the asked page, pulled back to the last page when it is past the end. */
+export function clampPage(page: number, total: number, size: number): number {
+  return Math.min(Math.max(1, page), pageCount(total, size));
+}
+
+/** The rows to skip for a page. */
+export function pageSkip(page: number, size: number): number {
+  return (Math.max(1, page) - 1) * size;
+}
+
+/**
+ * Runs a numbered page: counts, clamps the page to the last one, then fetches that page. `fetch(skip, limit)` reads
+ * the rows (already sorted by the caller).
+ */
+export async function numberedPage<T>(input: { page: unknown; size: number; count: () => Promise<number>; fetch: (skip: number, limit: number) => Promise<T[]> }): Promise<NumberedPage<T>> {
+  const total = await input.count();
+  const page = clampPage(parsePageNumber(input.page, input.size), total, input.size);
+  const rows = total ? await input.fetch(pageSkip(page, input.size), input.size) : [];
+  return { rows, total, page, pageCount: pageCount(total, input.size), pageSize: input.size };
+}

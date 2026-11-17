@@ -43,7 +43,7 @@ have one implementation.
 - **Pages**: every page sits inside the console shell (left sidebar + content pane, see "Navigation" below) except
   `/sign-in`. Server components read through the repos; client components only where a page needs interaction
   (users, waitlist, JBux forms). An unreachable database is a visible message on the page, never a blank 500.
-  Pure black + green tokens from the portal, light theme mirrored (toggle at the sidebar bottom), `noindex`
+  The product theme (see "Theme" below), light theme mirrored (toggle at the sidebar bottom), `noindex`
   everywhere, security headers on every response (frame-ancestors none, nosniff, strict-origin-when-cross-origin).
   The tab icon is the Jazaix mark in orange (`public/favicon.ico`, `public/apple-touch-icon.png`), so an admin tab
   never looks like the portal's black one.
@@ -57,15 +57,43 @@ once, in `src/lib/nav.ts`; every page lives in the `src/app/(console)` route gro
 | Sidebar | Route | What it shows |
 | --- | --- | --- |
 | Overview | `/` | the four counts (waiting, approved, accounts, real JBux) and the 10 newest admin actions |
-| Users > List | `/users` | search by email / username / name, role, waitlist state, set role; 50 a page, "more" |
+| Users > List | `/users` | search by email / username / name, role, waitlist state, set role; 50 a page, "more"; each row opens the user |
+| (User detail) | `/users/[id]` | every field of the users row (token / secret / hash fields redacted), role (settable), waitlist state, wallet summary, sign-ins (first + latest: all the portal stores), play history and game sessions (50 a page each) |
 | Users > Waitlist | `/users/waitlist` | waiting and approved, approve, move back (`/waitlist` redirects here) |
 | Games > List | `/games` | search slug / name / creator, sort by plays / rounds / updated; 50 a page, "more" |
-| (Games detail) | `/games/[slug]` | the game's fields and counters, keys (no key values), join requests, last 20 rooms |
+| (Games detail) | `/games/[slug]` | the game's fields and counters, keys (no key values), join requests, its rooms (25 a page, `?page=`) |
+| Games > Rooms | `/games/rooms` | every room, newest updated first, filter by game and state, 25 a page with previous / next |
+| (Room detail) | `/games/rooms/[roomId]` | every field of the room, its sessions, matches (with timeline), server event log (newest or oldest first), latest live snapshots (formatted JSON), client reports; each list capped and counted |
 | Assets > Catalog | `/assets/catalog` | the `catalog` collection, every field; the asset registry (jxasset) is not built yet |
 | JBux > Report | `/jbux` | the ledger report; refund and wallet hold (portal link) |
 | Audit > Admin actions | `/audit` | `admin_actions`, newest first, 100 a page, filter by actor and action |
 
-Games, catalog and audit are read only in this version.
+Games, rooms, catalog and audit are read only in this version. Every table fits the content pane (fixed layout,
+long values wrap or truncate with the full value in a tooltip, short dates); there is no inner horizontal scroll
+anywhere (`test/avatar-theme-layout.test.mjs` pins it). Avatars fall back to the portal's own fallback, the first
+letter on the surface colour, when a user has no picture or it fails to load; a portal-stored photo
+(`/api/images/...`) is loaded from `JX_PORTAL_URL` when that is set.
+
+## Theme
+The admin uses the product theme, the portal's `@theme` tokens copied verbatim from `jx-portal/src/app/globals.css`
+(dark: bg `#000000`, surface `#0b0b0c`, text `#ededed`, accent green `#22c55e`, notice `#f25a1a`, ...; light: the
+portal's light block, accent `#15803d`, notice `#c2410c`, ...), and the same fonts loaded the same way (Geist for
+sans, JetBrains Mono for mono via `next/font/google`, body in `font-mono`). `test/avatar-theme-layout.test.mjs` reads
+the portal's file and fails when a value drifts.
+
+**The one admin difference**: the admin accent is the brand's secondary colour, the notice orange (`#f25a1a` dark,
+`#c2410c` light), as the `--color-admin` token (`text-admin`, `bg-admin`, `bg-admin-hover`, `text-admin-ink`). It
+colours the JX mark in the sidebar lockup, the active sidebar item, focus rings, links and primary buttons, so an
+admin tab is unmistakable next to the green player portal. Green (`text-success`) stays for success and approved
+states. No component uses the green `accent` classes (a test pins it).
+
+**Lockup**: the portal's JX mark (`public/brand/jx-mark-v2.svg`, inlined in `src/components/Brand.tsx` with
+`fill: currentColor`) in the admin colour, the Jazaix wordmark (cropped from the portal's horizontal logo into
+`public/brand/jazaix-wordmark.png`, drawn as a mask so it takes the text colour) and the ADMIN tag. The sidebar, the
+mobile strip and the sign-in page use it.
+
+**Header band**: the sidebar's logo row and every page's crumb row are one band of the same height
+(`--spacing-header`, class `h-header`), vertically centred with the same bottom border; the page title starts below.
 
 ## What uses what
 | Section | Reads | Writes |
@@ -74,6 +102,8 @@ Games, catalog and audit are read only in this version.
 | Waitlist | MongoDB `users` | MongoDB `users` (+ `admin_actions`), Resend for the email |
 | Users | MongoDB `users` | MongoDB `users.role` (+ `admin_actions`) |
 | Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails) | nothing |
+| Rooms | MongoDB `rooms`, `game_sessions`, `matches`, `server_events`, `live_snapshots`, `client_reports` (all by `room_id`) | nothing |
+| User detail | MongoDB `users` (secrets redacted), `wallets`, `play_history` (+ `games` names), `game_sessions` (by `player_id`) | `users.role` through the same set-role control |
 | Assets catalog | MongoDB `catalog` | nothing |
 | Audit | MongoDB `admin_actions` | nothing (the other sections append to it) |
 | JBux report | MongoDB `credit_transactions`, `wallets`, `users` | nothing |

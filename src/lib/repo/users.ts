@@ -28,7 +28,7 @@ const SIGNUP_AS: readonly SignupAs[] = ["gamer", "developer", "both"];
 
 /** The projection every list shares (the portal's admin route PROJECTION). */
 export const USER_PROJECTION = {
-  email: 1, name: 1, username: 1, image: 1, role: 1, access: 1, createdAt: 1, lastLoginAt: 1, waitlistedAt: 1, approvedAt: 1, approvedBy: 1,
+  email: 1, name: 1, username: 1, image: 1, imageSmall: 1, role: 1, access: 1, createdAt: 1, lastLoginAt: 1, waitlistedAt: 1, approvedAt: 1, approvedBy: 1,
   waitlistEmails: 1, signupAs: 1,
 } as const;
 
@@ -38,6 +38,8 @@ export type UserView = {
   name: string;
   username: string;
   image: string;
+  /** The portal's 96 px copy of an uploaded photo, when there is one. */
+  imageSmall: string;
   role: string;
   access: Access;
   createdAt: string | null;
@@ -83,6 +85,7 @@ export function userView(u: UserDoc): UserView {
     name: typeof u.name === "string" ? u.name : "",
     username: typeof u.username === "string" ? u.username : "",
     image: typeof u.image === "string" ? u.image : "",
+    imageSmall: typeof u.imageSmall === "string" ? u.imageSmall : "",
     role: roleOf(u),
     access: accessOf(u),
     createdAt: iso(u.createdAt),

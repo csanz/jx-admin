@@ -73,7 +73,7 @@ export function JbuxConsole({ portalLinked }: { portalLinked: boolean }) {
 
   return (
     <div>
-      <PageHeader path="/jbux" title="JBux report" />
+      <PageHeader path="/jbux/ledger" title="Ledger" />
 
       <section aria-labelledby="report-h">
         <h2 id="report-h" className="text-base text-text font-semibold mb-3">Ledger report</h2>

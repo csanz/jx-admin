@@ -58,14 +58,14 @@ test("/waitlist redirects to /users/waitlist and no page is left at the old rout
   assert.equal(r.permanent, true);
 });
 
-test("the sidebar tree: Users (List, Waitlist), Games (List, Rooms), Assets (Catalog), JBux (Report), Audit (Admin actions)", () => {
+test("the sidebar tree: Users (List, Waitlist), Games (List, Rooms), Assets (Registry), JBux (Purchases, Catalog, Sellers, Wallets, Ledger), Audit", () => {
   assert.deepEqual(
     NAV.map((s) => [s.label, s.items.map((i) => `${i.label} ${i.href}`)]),
     [
       ["Users", ["List /users", "Waitlist /users/waitlist"]],
       ["Games", ["List /games", "Rooms /games/rooms"]],
-      ["Assets", ["Catalog /assets/catalog"]],
-      ["JBux", ["Report /jbux"]],
+      ["Assets", ["Registry /assets"]],
+      ["JBux", ["Purchases /jbux", "Catalog /jbux/catalog", "Sellers /jbux/sellers", "Wallets /jbux/wallets", "Ledger /jbux/ledger"]],
       ["Audit", ["Admin actions /audit"]],
     ],
   );
@@ -89,6 +89,8 @@ test("activeHref and navTrail: the longest matching item wins, detail pages ligh
   assert.equal(activeHref("/games/"), "/games");
   assert.equal(activeHref("/gamesx"), null);
   assert.equal(activeHref("/games/rooms/lm-dev"), "/games/rooms");
+  assert.equal(activeHref("/jbux/sellers/jazaix"), "/jbux/sellers");
+  assert.equal(activeHref("/jbux"), "/jbux");
   assert.equal(activeHref("/users/6ae204d8c05a94f95f234732"), "/users");
   assert.equal(activeHref("/sign-in"), null);
   assert.deepEqual(navTrail("/games/last-minute"), { section: "Games", item: "List" });

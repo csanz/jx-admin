@@ -22,8 +22,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/waitlist", destination: "/users/waitlist", permanent: true },
-      // the Assets section has one item so far
-      { source: "/assets", destination: "/assets/catalog", permanent: false },
+      // the cosmetics catalog moved under JBux (its items have a price); Assets keeps the registry page
+      { source: "/assets/catalog", destination: "/jbux/catalog", permanent: false },
     ];
   },
 };

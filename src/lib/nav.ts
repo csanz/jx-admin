@@ -24,8 +24,17 @@ export const NAV: NavSection[] = [
       { label: "Rooms", href: "/games/rooms" },
     ],
   },
-  { label: "Assets", items: [{ label: "Catalog", href: "/assets/catalog" }] },
-  { label: "JBux", items: [{ label: "Report", href: "/jbux" }] },
+  { label: "Assets", items: [{ label: "Registry", href: "/assets" }] },
+  {
+    label: "JBux",
+    items: [
+      { label: "Purchases", href: "/jbux" },
+      { label: "Catalog", href: "/jbux/catalog" },
+      { label: "Sellers", href: "/jbux/sellers" },
+      { label: "Wallets", href: "/jbux/wallets" },
+      { label: "Ledger", href: "/jbux/ledger" },
+    ],
+  },
   { label: "Audit", items: [{ label: "Admin actions", href: "/audit" }] },
 ];
 

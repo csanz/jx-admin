@@ -3,8 +3,8 @@
 The Jazaix admin console: a standalone Next.js app, deployed on Vercel at **admin.jazaix.com** (GitHub
 `csanz/jx-admin`), decoupled from the portal (jx-portal at https://play.jazaix.com). It has its own data layer: it
 reads and writes the platform database (MongoDB, the portal's `jx_portal`) directly. It shows the users (search, set
-role), the portal waitlist (approve, move back), the games (read only), the cosmetics catalog, the JBux ledger report
-and the audit trail of admin actions. Only the two money actions (a JBux
+role, one page per user), the portal waitlist (approve, move back), the games and their rooms (read only), JBux
+(purchases, the priced catalog with its sales, sellers, wallets, the ledger) and the audit trail of admin actions. Only the two money actions (a JBux
 refund, a wallet hold) are carried out by the portal's admin API, because those are the ledger's money rules and must
 have one implementation.
 
@@ -26,6 +26,10 @@ have one implementation.
     its keys (count, label, environment, status, created; never a key value), join requests and last 20 rooms.
     Read only.
   - `repo/catalog.ts`: the cosmetics catalog, every field the documents carry. Read only.
+  - `repo/rooms.ts`: rooms (25 a page, filters) and one room with everything that names its `room_id`. Read only.
+  - `repo/user-detail.ts`: one user, secrets redacted, wallet, sign-ins, play history, game sessions. Read only.
+  - `repo/jbux-sales.ts`: purchases (receipts, KPIs, top lists), the catalog with its sales, sellers, wallets.
+    Read only.
   - `repo/paging.ts`, `repo/values.ts`: 50-row pages with a "more" control (bounded), stored values as display text.
 - **Approval email**: on approve, the portal's "You're in" email goes through Resend (`src/lib/email.ts`) when
   `RESEND_API_KEY` is set (`JX_EMAIL_FROM`, `JX_EMAIL_REPLY_TO` optional) and the outcome is recorded on the user
@@ -64,15 +68,35 @@ once, in `src/lib/nav.ts`; every page lives in the `src/app/(console)` route gro
 | (Games detail) | `/games/[slug]` | the game's fields and counters, keys (no key values), join requests, its rooms (25 a page, `?page=`) |
 | Games > Rooms | `/games/rooms` | every room, newest updated first, filter by game and state, 25 a page with previous / next |
 | (Room detail) | `/games/rooms/[roomId]` | every field of the room, its sessions, matches (with timeline), server event log (newest or oldest first), latest live snapshots (formatted JSON), client reports; each list capped and counted |
-| Assets > Catalog | `/assets/catalog` | the `catalog` collection, every field; the asset registry (jxasset) is not built yet |
-| JBux > Report | `/jbux` | the ledger report; refund and wallet hold (portal link) |
+| Assets > Registry | `/assets` | the asset registry (jxasset) is not built yet; links to JBux > Catalog (`/assets/catalog` redirects there) |
+| JBux > Purchases | `/jbux` | KPI tiles (today, 7 and 30 days: purchases, JBux spent by pot, real revenue, refunds), top 5 items and games in the date range, every receipt newest first with filters (game, kind, funding, state, env, sku, buyer, dates), 50 a page |
+| JBux > Catalog | `/jbux/catalog` | every priced item with its sales (count, JBux gross by pot, last sale), sort by gross / sales / sku; an item opens its receipts |
+| JBux > Sellers | `/jbux/sellers` | one row per creator: games, items on sale, purchases, gross real / test / promo, last sale (gross figures, see below) |
+| (Seller detail) | `/jbux/sellers/[key]` | that seller's sales by item (`key` = the creator's user id, or `jazaix`) |
+| JBux > Wallets | `/jbux/wallets` | every wallet's pots, sort by real (default) / balance / promo / test / updated; promo and test outstanding |
+| JBux > Ledger | `/jbux/ledger` | the ledger report; refund and wallet hold (portal link), unchanged |
 | Audit > Admin actions | `/audit` | `admin_actions`, newest first, 100 a page, filter by actor and action |
 
-Games, rooms, catalog and audit are read only in this version. Every table fits the content pane (fixed layout,
+Games, rooms, JBux purchases / catalog / sellers / wallets and audit are read only in this version. Every table fits the content pane (fixed layout,
 long values wrap or truncate with the full value in a tooltip, short dates); there is no inner horizontal scroll
 anywhere (`test/avatar-theme-layout.test.mjs` pins it). Avatars fall back to the portal's own fallback, the first
 letter on the surface colour, when a user has no picture or it fails to load; a portal-stored photo
 (`/api/images/...`) is loaded from `JX_PORTAL_URL` when that is set.
+
+## JBux figures
+- A **purchase** is a `jbox_receipts` row. Counts include every receipt; JBux sums (spent, gross, revenue) leave
+  refunded receipts out. Refunds are counted from `credit_transactions` (kind `refund`). **Real revenue** is the real
+  pot only; test and promo JBux are never money. Days are UTC.
+- **Env**: on a production deployment (`NODE_ENV=production`) the pages default to env `prod`; elsewhere to every
+  env. The env switch at the top picks another (`?env=all|prod|staging|dev|local`). Note: `next start` runs with
+  `NODE_ENV=production`, so a local `next start` against the local database (env `local` receipts) shows nothing until
+  you pick `all` or `local`.
+- **Sellers** are derived, there is no seller ledger: the receipt's sku, the catalog item, its `gameId`, the game's
+  `creator_id`. Platform-wide items (`gameId` null) and items whose game has no creator are attributed to **Jazaix**;
+  a sold sku that left the catalog goes through the game it sold in. The figures are **gross**: the platform share and
+  payouts are not defined yet (owner decision pending), so nothing on those pages is an amount owed.
+- The database does the grouping (aggregation pipelines by UTC day and by sku in `src/lib/repo/jbux-sales.ts`); the
+  roll-ups into windows, top lists and sellers are pure functions tested in `test/repo-jbux-sales.test.mjs`.
 
 ## Theme
 The admin uses the product theme, the portal's `@theme` tokens copied verbatim from `jx-portal/src/app/globals.css`
@@ -104,9 +128,9 @@ mobile strip and the sign-in page use it.
 | Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails) | nothing |
 | Rooms | MongoDB `rooms`, `game_sessions`, `matches`, `server_events`, `live_snapshots`, `client_reports` (all by `room_id`) | nothing |
 | User detail | MongoDB `users` (secrets redacted), `wallets`, `play_history` (+ `games` names), `game_sessions` (by `player_id`) | `users.role` through the same set-role control |
-| Assets catalog | MongoDB `catalog` | nothing |
 | Audit | MongoDB `admin_actions` | nothing (the other sections append to it) |
-| JBux report | MongoDB `credit_transactions`, `wallets`, `users` | nothing |
+| JBux report (ledger) | MongoDB `credit_transactions`, `wallets`, `users` | nothing |
+| JBux purchases, catalog, sellers, wallets | MongoDB `jbox_receipts`, `credit_transactions` (refunds), `catalog`, `games` (creators), `wallets`, `users` | nothing |
 | JBux refund, wallet hold | portal `/api/admin/jbox/refund`, `/hold` (service token) | the portal does the money |
 
 ## Local run

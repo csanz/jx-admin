@@ -18,6 +18,7 @@ export async function TopBar({ theme }: { theme: "dark" | "light" }) {
         {email && (
           <nav className="flex items-center gap-1 sm:gap-2 text-sm min-w-0 overflow-x-auto" aria-label="Sections">
             <Link href="/waitlist" className="px-2 py-1 rounded text-text-muted hover:text-text whitespace-nowrap">Waitlist</Link>
+            <Link href="/users" className="px-2 py-1 rounded text-text-muted hover:text-text whitespace-nowrap">Users</Link>
             <Link href="/jbux" className="px-2 py-1 rounded text-text-muted hover:text-text whitespace-nowrap">JBux</Link>
           </nav>
         )}

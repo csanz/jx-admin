@@ -23,8 +23,8 @@ function routeFiles(dir, out = []) {
 
 test("every src/app/api/**/route.ts imports the admin gate (except the two named exceptions)", () => {
   const files = routeFiles(API).map((f) => path.relative(API, f)).sort();
-  assert.ok(files.length >= 7, `expected the known routes, found ${files.length}`);
-  const expected = ["auth/[...nextauth]/route.ts", "health/route.ts", "jbox/hold/route.ts", "jbox/refund/route.ts", "jbox/report/route.ts", "me/route.ts", "waitlist/route.ts"];
+  assert.ok(files.length >= 8, `expected the known routes, found ${files.length}`);
+  const expected = ["auth/[...nextauth]/route.ts", "health/route.ts", "jbox/hold/route.ts", "jbox/refund/route.ts", "jbox/report/route.ts", "me/route.ts", "users/route.ts", "waitlist/route.ts"];
   assert.deepEqual(files, expected);
   for (const rel of files) {
     const src = fs.readFileSync(path.join(API, rel), "utf8");
@@ -44,9 +44,31 @@ test("every src/app/api/**/route.ts imports the admin gate (except the two named
   }
 });
 
-test("the health route never reads the token or the secret", () => {
+test("the health route never reads the token, the secret or the Mongo URI", () => {
   const src = fs.readFileSync(path.join(API, "health/route.ts"), "utf8");
-  assert.doesNotMatch(src, /JX_ADMIN_API_TOKEN|AUTH_SECRET|GOOGLE_CLIENT|readEnv/);
+  assert.doesNotMatch(src, /JX_ADMIN_API_TOKEN|AUTH_SECRET|GOOGLE_CLIENT|MONGODB_URI|readEnv/);
+});
+
+test("the repo modules have no framework imports (node runs them directly)", () => {
+  const dir = path.join(ROOT, "src/lib/repo");
+  for (const f of fs.readdirSync(dir)) {
+    const src = fs.readFileSync(path.join(dir, f), "utf8");
+    assert.doesNotMatch(src, /from "(next|next\/[^"]*|react|next-auth[^"]*)"/, `${f} must not import a framework`);
+    assert.doesNotMatch(src, /process\.env/, `${f} must not read env; it takes a Db`);
+  }
+});
+
+test("the money mutations are never ported: refund and hold go through the portal link", () => {
+  for (const rel of ["jbox/refund/route.ts", "jbox/hold/route.ts"]) {
+    const src = fs.readFileSync(path.join(API, rel), "utf8");
+    assert.match(src, /proxyToPortal\("\/api\/admin\/jbox\/(refund|hold)"/, `${rel} must call the portal`);
+    assert.doesNotMatch(src, /mongoDb|lib\/mongo|lib\/repo/, `${rel} must not touch the database`);
+  }
+  const repoDir = path.join(ROOT, "src/lib/repo");
+  for (const f of fs.readdirSync(repoDir)) {
+    const src = fs.readFileSync(path.join(repoDir, f), "utf8");
+    assert.doesNotMatch(src, /collection\("wallets"\)\.(updateOne|findOneAndUpdate|insertOne|bulkWrite)|collection\("credit_transactions"\)\.(insertOne|updateOne)/, `${f} must not write money rows`);
+  }
 });
 
 test("no browser-facing module imports the portal client", () => {
@@ -61,7 +83,7 @@ test("no browser-facing module imports the portal client", () => {
   for (const f of walk(path.join(ROOT, "src"))) {
     const src = fs.readFileSync(f, "utf8");
     if (/^\s*["']use client["']/m.test(src)) {
-      assert.doesNotMatch(src, /lib\/portal|lib\/env|lib\/auth|JX_ADMIN_API_TOKEN/, `${path.relative(ROOT, f)} is a client module and must not touch the portal client, env or auth`);
+      assert.doesNotMatch(src, /lib\/portal|lib\/env|lib\/auth|lib\/mongo|lib\/repo|JX_ADMIN_API_TOKEN|MONGODB_URI/, `${path.relative(ROOT, f)} is a client module and must not touch the portal client, the database, env or auth`);
     }
   }
 });

@@ -2,9 +2,9 @@
 
 /**
  * THE PORTAL WAITLIST, ported from the portal's /admin (src/app/admin/AdminWaitlist.tsx) with the same look. The
- * data and the actions go to this app's /api/waitlist, which proxies the portal with the signed-in admin as actor.
- * The portal's gate/email banner is not shown here: the portal's env is not this app's to read; the per-row email
- * status and the approval notices still come from the portal's answers.
+ * data and the actions go to this app's /api/waitlist, which reads and writes the platform database directly
+ * (src/lib/repo/waitlist.ts) as the signed-in admin. The per-row email status comes from the users rows
+ * (waitlistEmails) and the approval notice from the console's own send.
  */
 import { useCallback, useEffect, useState } from "react";
 import { errorText, when } from "@/lib/format";
@@ -51,7 +51,7 @@ export function AdminWaitlist({ adminEmail }: { adminEmail: string }) {
 
   const act = async (row: Row, action: "approve" | "waitlist") => {
     const who = row.email || row.name;
-    const ask = action === "approve" ? `Approve ${who}? The portal sends the "You're in" email.` : `Move ${who} back to the waitlist?`;
+    const ask = action === "approve" ? `Approve ${who}? The "You're in" email is sent when email is configured.` : `Move ${who} back to the waitlist?`;
     if (!window.confirm(ask)) return;
     setBusy(row.id);
     setError("");
@@ -64,7 +64,7 @@ export function AdminWaitlist({ adminEmail }: { adminEmail: string }) {
       if (!res.ok) throw new Error(errorText(res.status, body));
       if (action === "approve") {
         setNotice(body.email === "sent" ? `Approved ${who}. "You're in" email sent.`
-          : body.email === "not-configured" ? `Approved ${who}. No email: email is not set up on the portal yet.`
+          : body.email === "not-configured" ? `Approved ${who}. No email was sent: RESEND_API_KEY is not set on the console.`
           : `Approved ${who}, but the email did not go out (${body.email ?? "unknown"}).`);
       } else setNotice(`Moved ${who} back to the waitlist.`);
       await load();

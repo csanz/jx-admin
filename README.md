@@ -52,8 +52,8 @@ npm run build       # next build --webpack
 4. **Google OAuth**: in the Google Cloud console, either create a new OAuth client (Web application) or add to the
    existing portal client the authorised redirect URI `https://admin.jazaix.com/api/auth/callback/google` (and the
    authorised JavaScript origin `https://admin.jazaix.com`). Put its id and secret in step 2.
-5. **Portal side** (jx-portal env): `JX_ADMIN_API_TOKEN` with the same value as here, and
-   `JX_ADMIN_ORIGINS=https://admin.jazaix.com`. The portal verifies the bearer token and re-checks the
+5. **Portal side** (jx-portal env on the box, `/etc/jx/portal.env`): `JX_ADMIN_API_TOKEN` with the same value as here
+   (32 characters or more). No origin setting is needed: the calls are server to server. The portal verifies the bearer token and re-checks the
    `X-Jx-Admin-Email` role in its database on every call.
 6. **Check**: `https://admin.jazaix.com/api/health` answers `{ "ok": true, "portal": true }`; sign in with an admin
    email; the dashboard shows the waitlist counts and the JBux totals.

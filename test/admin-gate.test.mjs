@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decideAdmin, isAllowlisted, normalizeEmail, parseAllowlist, portalConfirmsAdmin, gateReasonText } from "../src/lib/admin-gate.ts";
+import { decideAdmin, isAllowlisted, normalizeEmail, parseAllowlist, rowConfirmsAdmin, gateReasonText } from "../src/lib/admin-gate.ts";
 
-const ok = (email) => async () => ({ status: 200, body: { email, role: "admin" } });
+const ID = "aaaaaaaaaaaaaaaaaaaaaaaa";
+const adminRow = (email) => async () => ({ id: ID, email, role: "admin" });
 
 test("parseAllowlist: trims, lowercases, drops blanks and non-emails", () => {
   const l = parseAllowlist(" Owner@Jazaix.com, dev@x.io ,, not-an-email , ");
@@ -20,51 +21,46 @@ test("isAllowlisted is case-insensitive on both sides", () => {
   assert.equal(normalizeEmail("nope"), null);
 });
 
-test("portalConfirmsAdmin needs 200, role admin and the same email", () => {
-  assert.equal(portalConfirmsAdmin("a@x.io", 200, { email: "A@X.io", role: "admin" }), true);
-  assert.equal(portalConfirmsAdmin("a@x.io", 200, { email: "a@x.io", role: "developer" }), false);
-  assert.equal(portalConfirmsAdmin("a@x.io", 200, { email: "b@x.io", role: "admin" }), false);
-  assert.equal(portalConfirmsAdmin("a@x.io", 403, { email: "a@x.io", role: "admin" }), false);
-  assert.equal(portalConfirmsAdmin("a@x.io", 200, null), false);
-  assert.equal(portalConfirmsAdmin("a@x.io", 200, "admin"), false);
+test("rowConfirmsAdmin needs a row with role exactly admin, an id, and the same email", () => {
+  assert.equal(rowConfirmsAdmin("a@x.io", { id: ID, email: "A@X.io", role: "admin" }), true);
+  assert.equal(rowConfirmsAdmin("a@x.io", { id: ID, email: "a@x.io", role: "developer" }), false);
+  assert.equal(rowConfirmsAdmin("a@x.io", { id: ID, email: "a@x.io", role: "player" }), false);
+  assert.equal(rowConfirmsAdmin("a@x.io", { id: ID, email: "b@x.io", role: "admin" }), false);
+  assert.equal(rowConfirmsAdmin("a@x.io", { id: "", email: "a@x.io", role: "admin" }), false);
+  assert.equal(rowConfirmsAdmin("a@x.io", null), false);
 });
 
-test("decideAdmin: admin only when allowlisted AND the portal says admin", async () => {
+test("decideAdmin: admin only when allowlisted AND the users row in Mongo says admin; the id travels with the actor", async () => {
   const l = parseAllowlist("owner@jazaix.com");
-  const d = await decideAdmin("Owner@Jazaix.com", l, ok("owner@jazaix.com"));
-  assert.deepEqual(d, { admin: true, email: "owner@jazaix.com", role: "admin" });
+  const d = await decideAdmin("Owner@Jazaix.com", l, adminRow("owner@jazaix.com"));
+  assert.deepEqual(d, { admin: true, email: "owner@jazaix.com", role: "admin", id: ID });
 });
 
-test("decideAdmin: allowlisted but the portal role is not admin -> portal-role", async () => {
+test("decideAdmin: allowlisted but the row's role is not admin, or there is no row -> not-admin-role", async () => {
   const l = parseAllowlist("owner@jazaix.com");
-  const d = await decideAdmin("owner@jazaix.com", l, async () => ({ status: 200, body: { email: "owner@jazaix.com", role: "player" } }));
-  assert.equal(d.admin, false);
-  assert.equal(d.reason, "portal-role");
+  assert.equal((await decideAdmin("owner@jazaix.com", l, async () => ({ id: ID, email: "owner@jazaix.com", role: "developer" }))).reason, "not-admin-role");
+  assert.equal((await decideAdmin("owner@jazaix.com", l, async () => null)).reason, "not-admin-role");
 });
 
-test("decideAdmin: portal admin but not allowlisted -> not-allowlisted, and the portal is never asked", async () => {
+test("decideAdmin: admin in Mongo but not allowlisted -> not-allowlisted, and the database is never asked", async () => {
   let asked = 0;
-  const d = await decideAdmin("stranger@x.io", parseAllowlist("owner@jazaix.com"), async (e) => { asked++; return ok(e)(); });
+  const d = await decideAdmin("stranger@x.io", parseAllowlist("owner@jazaix.com"), async (e) => { asked++; return adminRow(e)(); });
   assert.equal(d.admin, false);
   assert.equal(d.reason, "not-allowlisted");
   assert.equal(asked, 0);
 });
 
-test("decideAdmin: no email -> signed-out; portal down or throwing -> portal-unavailable", async () => {
+test("decideAdmin: no email -> signed-out; a throwing lookup (database down) -> db-unavailable, never admin", async () => {
   const l = parseAllowlist("owner@jazaix.com");
-  assert.equal((await decideAdmin(null, l, ok("x"))).reason, "signed-out");
-  assert.equal((await decideAdmin("", l, ok("x"))).reason, "signed-out");
-  assert.equal((await decideAdmin("owner@jazaix.com", l, async () => ({ status: 503, body: null }))).reason, "portal-unavailable");
-  assert.equal((await decideAdmin("owner@jazaix.com", l, async () => { throw new Error("boom"); })).reason, "portal-unavailable");
-});
-
-test("decideAdmin: a 404 or 403 from the portal for the person is a role refusal, not an outage", async () => {
-  const l = parseAllowlist("owner@jazaix.com");
-  assert.equal((await decideAdmin("owner@jazaix.com", l, async () => ({ status: 404, body: { error: "not-found" } }))).reason, "portal-role");
+  assert.equal((await decideAdmin(null, l, adminRow("x"))).reason, "signed-out");
+  assert.equal((await decideAdmin("", l, adminRow("x"))).reason, "signed-out");
+  const d = await decideAdmin("owner@jazaix.com", l, async () => { throw new Error("MongoServerSelectionError"); });
+  assert.equal(d.admin, false);
+  assert.equal(d.reason, "db-unavailable");
 });
 
 test("gateReasonText has a short line for every reason and never a value", () => {
-  for (const r of ["signed-out", "not-allowlisted", "portal-role", "portal-unavailable"]) {
+  for (const r of ["signed-out", "not-allowlisted", "not-admin-role", "db-unavailable"]) {
     const t = gateReasonText(r);
     assert.ok(t.length > 10 && t.length < 160, r);
   }

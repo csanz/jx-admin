@@ -1,0 +1,192 @@
+/**
+ * Integration tests against a real MongoDB. They run only when JX_TEST_MONGO_URI is set, for example
+ *   JX_TEST_MONGO_URI='mongodb://localhost:27018/?replicaSet=jx-db-local-rs&directConnection=true' npm test
+ * They create their OWN database, jxadmin_test_<random>, and drop it at the end. They never touch jx_portal.
+ */
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { ObjectId } from "mongodb";
+import { mongoClientFor } from "../src/lib/mongo.ts";
+import { parseAllowlist, decideAdmin } from "../src/lib/admin-gate.ts";
+import { AUDIT_COLLECTION } from "../src/lib/repo/audit.ts";
+import { findUserRoleByEmail, searchUsers, setUserRole } from "../src/lib/repo/users.ts";
+import { applyWaitlistAction, listWaitlist, waitlistCounts } from "../src/lib/repo/waitlist.ts";
+import { getJbuxReport } from "../src/lib/repo/jbux-report.ts";
+
+const URI = process.env.JX_TEST_MONGO_URI || "";
+const skip = URI ? false : "JX_TEST_MONGO_URI is not set";
+const DB_NAME = `jxadmin_test_${Math.random().toString(36).slice(2, 10)}`;
+assert.notEqual(DB_NAME, "jx_portal");
+
+const NOW = new Date("2026-11-17T12:00:00Z");
+const ADMIN_ID = new ObjectId();
+const DEV_ID = new ObjectId();
+const WAIT_A = new ObjectId();
+const WAIT_B = new ObjectId();
+const OLD_ID = new ObjectId();
+const BOT_ID = new ObjectId();
+
+let client;
+let db;
+
+before(async () => {
+  client = await mongoClientFor(URI);
+  db = client.db(DB_NAME);
+  await db.collection("users").insertMany([
+    { _id: ADMIN_ID, email: "owner@jazaix.com", name: "Owner", username: "owner", role: "admin", createdAt: new Date("2026-10-01T00:00:00Z") },
+    { _id: DEV_ID, email: "dev@jazaix.com", name: "Dev", username: "dev", role: "developer", createdAt: new Date("2026-10-02T00:00:00Z") },
+    { _id: WAIT_A, email: "a@example.com", name: "Alice Waiting", username: "alice", role: "player", access: "waitlist", createdAt: new Date("2026-11-10T00:00:00Z"), waitlistedAt: new Date("2026-11-10T00:00:00Z"), signupAs: "developer" },
+    { _id: WAIT_B, email: "b@example.com", name: "Bob Waiting", username: "bob", role: "player", access: "waitlist", createdAt: new Date("2026-11-12T00:00:00Z"), waitlistedAt: new Date("2026-11-12T00:00:00Z") },
+    { _id: OLD_ID, email: "old@example.com", name: "Old Account", username: "old", role: "player", createdAt: new Date("2026-09-01T00:00:00Z") },
+    { _id: BOT_ID, email: "bot-1@crew.jazaix.com", name: "Crew 1", role: "bot", access: "waitlist", createdAt: new Date("2026-11-01T00:00:00Z") },
+  ]);
+  await db.collection("wallets").insertMany([
+    { userId: OLD_ID.toString(), balance: 150, funds: { real: 100, test: 0, promo: 50 }, hold: "admin" },
+    { userId: WAIT_A.toString(), balance: 30, funds: { real: 0, test: 30, promo: 0 } },
+    { userId: DEV_ID.toString(), balance: 20 }, // legacy wallet without funds: its balance counts as test money
+  ]);
+  await db.collection("credit_transactions").insertMany([
+    { kind: "purchase", source: "stripe", funding: "real", amount: 100, userId: OLD_ID.toString(), at: new Date("2026-11-01T10:00:00Z") },
+    { kind: "grant", source: "test-buy", funding: "test", amount: 30, userId: WAIT_A.toString(), at: new Date("2026-11-02T10:00:00Z"), env: "local", packId: "pack-s" },
+    { kind: "grant", source: "test-buy", funding: "test", amount: 20, userId: DEV_ID.toString(), at: new Date("2026-11-03T10:00:00Z"), env: "local", packId: "pack-s" },
+    { kind: "grant", source: "promo", funding: "promo", amount: 50, userId: OLD_ID.toString(), at: new Date("2026-11-04T10:00:00Z") },
+    { kind: "spend", source: "last-minute", split: { real: 10, test: 0, promo: 5 }, amount: -15, userId: OLD_ID.toString(), at: new Date("2026-11-05T10:00:00Z") },
+  ]);
+}, { skip });
+
+after(async () => {
+  if (db) await db.dropDatabase();
+  if (client) await client.close();
+}, { skip });
+
+test("gate: admin = allowlisted AND role admin in Mongo (looked up lower-cased); developer or missing row is refused", { skip }, async () => {
+  const users = db.collection("users");
+  const lookup = (e) => findUserRoleByEmail(users, e);
+  const allow = parseAllowlist("owner@jazaix.com, dev@jazaix.com, ghost@jazaix.com");
+  const ok = await decideAdmin("Owner@Jazaix.com", allow, lookup);
+  assert.deepEqual(ok, { admin: true, email: "owner@jazaix.com", role: "admin", id: ADMIN_ID.toString() });
+  assert.equal((await decideAdmin("dev@jazaix.com", allow, lookup)).reason, "not-admin-role");
+  assert.equal((await decideAdmin("ghost@jazaix.com", allow, lookup)).reason, "not-admin-role");
+  assert.equal((await decideAdmin("a@example.com", allow, lookup)).reason, "not-allowlisted");
+});
+
+test("waitlist: counts and lists match the portal's filters and order; bots never appear", { skip }, async () => {
+  assert.deepEqual(await waitlistCounts(db), { waiting: 2, approved: 3 });
+  const waiting = await listWaitlist(db, "waitlist", "");
+  assert.deepEqual(waiting.users.map((u) => u.email), ["b@example.com", "a@example.com"]);
+  assert.equal(waiting.users[1].signupAs, "developer");
+  assert.equal(waiting.users[1].access, "waitlist");
+  const approved = await listWaitlist(db, "approved", "");
+  assert.deepEqual(approved.users.map((u) => u.email).sort(), ["dev@jazaix.com", "old@example.com", "owner@jazaix.com"]);
+  assert.deepEqual((await listWaitlist(db, "waitlist", "ALICE")).users.map((u) => u.email), ["a@example.com"]);
+});
+
+test("waitlist: approve writes access/approvedAt/approvedBy, sends and records the email, audits; a second approve is 409", { skip }, async () => {
+  const sent = [];
+  const sendEmail = async (msg) => { sent.push(msg); return { status: "sent", id: "em_test" }; };
+  const r = await applyWaitlistAction(db, { userId: WAIT_A.toString(), action: "approve", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail, now: NOW });
+  assert.equal(r.ok, true);
+  assert.equal(r.email, "sent");
+  assert.equal(r.user.access, "approved");
+  assert.equal(r.user.approvedBy, "owner@jazaix.com");
+  assert.equal(r.user.emails.approved, "sent");
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, "a@example.com");
+  assert.equal(sent[0].idempotencyKey, `waitlist-approved-${WAIT_A.toString()}-${NOW.getTime()}`);
+  const row = await db.collection("users").findOne({ _id: WAIT_A });
+  assert.equal(row.access, "approved");
+  assert.equal(row.approvedAt.getTime(), NOW.getTime());
+  assert.deepEqual(row.approvedBy, { id: ADMIN_ID.toString(), email: "owner@jazaix.com" });
+  assert.equal(row.waitlistEmails.approved.status, "sent");
+  assert.equal(row.waitlistEmails.approved.id, "em_test");
+  assert.deepEqual(await waitlistCounts(db), { waiting: 1, approved: 4 });
+  const again = await applyWaitlistAction(db, { userId: WAIT_A.toString(), action: "approve", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail, now: NOW });
+  assert.deepEqual(again, { ok: false, status: 409, error: "already-approved", message: "Already approved." });
+  assert.equal(sent.length, 1);
+  const audit = await db.collection(AUDIT_COLLECTION).find({ action: "waitlist-approve" }).toArray();
+  assert.equal(audit.length, 1);
+  assert.deepEqual({ ...audit[0], _id: undefined }, { _id: undefined, at: NOW, actor: "owner@jazaix.com", action: "waitlist-approve", target: WAIT_A.toString(), via: "admin-console", details: { email: "sent" } });
+});
+
+test("waitlist: approve without email config still approves and says not-configured", { skip }, async () => {
+  const r = await applyWaitlistAction(db, { userId: WAIT_B.toString(), action: "approve", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail: null, now: NOW });
+  assert.equal(r.ok, true);
+  assert.equal(r.email, "not-configured");
+  assert.equal((await db.collection("users").findOne({ _id: WAIT_B })).waitlistEmails.approved.status, "not-configured");
+  assert.deepEqual(await waitlistCounts(db), { waiting: 0, approved: 5 });
+});
+
+test("waitlist: move back unsets approvedAt/approvedBy and restarts the wait; admins and developers are never moved back; unknown id is 404", { skip }, async () => {
+  const later = new Date("2026-11-18T12:00:00Z");
+  const r = await applyWaitlistAction(db, { userId: WAIT_B.toString(), action: "waitlist", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail: null, now: later });
+  assert.equal(r.ok, true);
+  assert.equal(r.email, null);
+  const row = await db.collection("users").findOne({ _id: WAIT_B });
+  assert.equal(row.access, "waitlist");
+  assert.equal(row.waitlistedAt.getTime(), later.getTime());
+  assert.equal("approvedAt" in row, false);
+  assert.equal("approvedBy" in row, false);
+  assert.deepEqual(await waitlistCounts(db), { waiting: 1, approved: 4 });
+  const dev = await applyWaitlistAction(db, { userId: DEV_ID.toString(), action: "waitlist", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail: null });
+  assert.equal(dev.ok, false);
+  assert.equal(dev.error, "always-has-access");
+  const none = await applyWaitlistAction(db, { userId: new ObjectId().toString(), action: "approve", admin: { id: ADMIN_ID.toString(), email: "owner@jazaix.com" }, sendEmail: null });
+  assert.equal(none.status, 404);
+  const audit = await db.collection(AUDIT_COLLECTION).findOne({ action: "waitlist-move-back" });
+  assert.equal(audit.target, WAIT_B.toString());
+  assert.equal("details" in audit, false);
+});
+
+test("users: search by email or username; set role writes users.role and audits; self-demotion is refused and leaves no trace", { skip }, async () => {
+  const byEmail = await searchUsers(db, "old@example");
+  assert.deepEqual(byEmail.users.map((u) => u.username), ["old"]);
+  assert.equal(byEmail.total, 1);
+  const byUsername = await searchUsers(db, "ali");
+  assert.deepEqual(byUsername.users.map((u) => u.email), ["a@example.com"]);
+  const all = await searchUsers(db, "");
+  assert.equal(all.total, 6);
+  assert.equal(all.users[0].email, "b@example.com"); // newest first
+
+  const actor = { id: ADMIN_ID.toString(), email: "owner@jazaix.com" };
+  const up = await setUserRole(db, { userId: OLD_ID.toString(), role: "developer", actor, now: NOW });
+  assert.equal(up.ok, true);
+  assert.equal(up.changed, true);
+  assert.equal(up.user.role, "developer");
+  assert.equal((await db.collection("users").findOne({ _id: OLD_ID })).role, "developer");
+  const audit = await db.collection(AUDIT_COLLECTION).findOne({ action: "set-role", target: OLD_ID.toString() });
+  assert.deepEqual({ ...audit, _id: undefined }, { _id: undefined, at: NOW, actor: "owner@jazaix.com", action: "set-role", target: OLD_ID.toString(), via: "admin-console", details: { from: "player", to: "developer" } });
+
+  const before = await db.collection(AUDIT_COLLECTION).countDocuments();
+  const self = await setUserRole(db, { userId: ADMIN_ID.toString(), role: "player", actor, now: NOW });
+  assert.equal(self.ok, false);
+  assert.equal(self.error, "self-demotion");
+  assert.equal((await db.collection("users").findOne({ _id: ADMIN_ID })).role, "admin");
+  assert.equal(await db.collection(AUDIT_COLLECTION).countDocuments(), before);
+
+  const bot = await setUserRole(db, { userId: BOT_ID.toString(), role: "admin", actor });
+  assert.equal(bot.error, "bot-account");
+  assert.equal((await setUserRole(db, { userId: new ObjectId().toString(), role: "admin", actor })).status, 404);
+});
+
+test("JBux report: real, test and promo money stay apart; splits, debits, legacy wallets and test buys as the portal counts them", { skip }, async () => {
+  const r = await getJbuxReport(db);
+  assert.deepEqual(r.byFunding, { real: { credited: 100, debited: 10 }, test: { credited: 50, debited: 0 }, promo: { credited: 50, debited: 5 } });
+  assert.deepEqual(r.wallets, { real: 100, test: 50, promo: 50, balance: 200, onHold: 1, count: 3 });
+  const spend = r.lines.find((l) => l.kind === "spend");
+  assert.deepEqual(spend, { kind: "spend", source: "last-minute", rows: 1, real: 10, test: 0, promo: 5 });
+  const testBuy = r.lines.find((l) => l.kind === "grant" && l.source === "test-buy");
+  assert.deepEqual(testBuy, { kind: "grant", source: "test-buy", rows: 2, real: 0, test: 50, promo: 0 });
+  assert.deepEqual(r.testBuys.map((b) => [b.email, b.amount, b.packId, b.env]), [["dev@jazaix.com", 20, "pack-s", "local"], ["a@example.com", 30, "pack-s", "local"]]);
+  assert.equal(r.testBuys[0].at, "2026-11-03T10:00:00.000Z");
+
+  const realOnly = await getJbuxReport(db, { funding: "real" });
+  assert.deepEqual(realOnly.lines.map((l) => l.kind).sort(), ["purchase", "spend"]);
+  assert.equal(realOnly.filter.funding, "real");
+  const window = await getJbuxReport(db, { from: "2026-11-02", to: "2026-11-03" });
+  assert.equal(window.lines.length, 1);
+  assert.equal(window.testBuys.length, 1);
+  assert.equal(window.testBuys[0].email, "a@example.com");
+  assert.deepEqual(window.byFunding.test, { credited: 30, debited: 0 });
+  // the wallet pots are the live totals, whatever the ledger filter
+  assert.deepEqual(window.wallets, r.wallets);
+});

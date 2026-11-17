@@ -1,15 +1,17 @@
 /**
- * GET /api/health -> { ok: true, portal: <reachable boolean> }. No auth, no config in the answer: it only says
- * whether this app runs and whether the portal answered an unauthenticated HEAD within 5 s.
+ * GET /api/health -> { ok: true, mongo: <boolean>, portal: <boolean | null> }. No auth, no config in the answer: it
+ * only says whether this app runs, whether the platform database answered a ping within 5 s, and whether the
+ * optional portal link's host answered an unauthenticated HEAD within 5 s (null when the link is not configured).
  */
 import { NextResponse } from "next/server";
 import { portalUrlIfSet } from "@/lib/env";
+import { mongoReachable } from "@/lib/mongo";
 
 export const dynamic = "force-dynamic";
 
-async function portalReachable(): Promise<boolean> {
+async function portalReachable(): Promise<boolean | null> {
   const url = portalUrlIfSet();
-  if (!url) return false;
+  if (!url) return null;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 5000);
   try {
@@ -23,5 +25,6 @@ async function portalReachable(): Promise<boolean> {
 }
 
 export async function GET() {
-  return NextResponse.json({ ok: true, portal: await portalReachable() }, { headers: { "Cache-Control": "no-store" } });
+  const [mongo, portal] = await Promise.all([mongoReachable(), portalReachable()]);
+  return NextResponse.json({ ok: true, mongo, portal }, { headers: { "Cache-Control": "no-store" } });
 }

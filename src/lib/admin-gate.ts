@@ -1,14 +1,17 @@
 /**
  * THE ADMIN GATE, pure part. A signed-in user is an admin only when BOTH hold:
  *   1. the email is on JX_DEVELOPER_EMAILS (comma list, case-insensitive), and
- *   2. the portal confirms role "admin" for that email (GET {JX_PORTAL_URL}/api/admin/me).
+ *   2. the users row for that email (looked up lower-cased) holds role "admin", read from MongoDB on every request
+ *      (never cached in the session, so a demotion takes effect at once).
  * No JSX, no framework imports: node runs this file directly in the tests. src/lib/require-admin.ts wires it to the
- * session and the portal client.
+ * session and the users repo (src/lib/repo/users.ts); the portal's /api/admin/me is no longer part of the gate.
  */
 
 export type GateDecision =
-  | { admin: true; email: string; role: string }
-  | { admin: false; email: string | null; reason: "signed-out" | "not-allowlisted" | "portal-role" | "portal-unavailable" };
+  | { admin: true; email: string; role: "admin"; id: string }
+  | { admin: false; email: string | null; reason: "signed-out" | "not-allowlisted" | "not-admin-role" | "db-unavailable" };
+
+export type GateRefusal = Exclude<GateDecision, { admin: true }>["reason"];
 
 export function normalizeEmail(email: string | null | undefined): string | null {
   if (typeof email !== "string") return null;
@@ -31,53 +34,45 @@ export function isAllowlisted(email: string | null | undefined, allowlist: Set<s
   return e !== null && allowlist.has(e);
 }
 
-/** What the portal's GET /api/admin/me answers: { email, role }. */
-export type PortalMe = { email?: unknown; role?: unknown };
+/** What the users row says for an email: its id and role, or null when there is no row. */
+export type RoleRow = { id: string; email: string; role: string } | null;
+export type RoleLookup = (email: string) => Promise<RoleRow>;
 
-/** The portal confirms the role only when it answers 200 with role "admin" for the SAME email. */
-export function portalConfirmsAdmin(email: string, status: number, body: unknown): boolean {
-  if (status !== 200 || !body || typeof body !== "object") return false;
-  const me = body as PortalMe;
-  if (me.role !== "admin") return false;
-  const portalEmail = normalizeEmail(typeof me.email === "string" ? me.email : null);
-  return portalEmail === normalizeEmail(email);
+/** The row confirms the admin only with role exactly "admin" (and the email, when present, the same person). */
+export function rowConfirmsAdmin(email: string, row: RoleRow): row is { id: string; email: string; role: "admin" } {
+  if (!row || row.role !== "admin" || !row.id) return false;
+  const rowEmail = normalizeEmail(row.email);
+  return rowEmail === null || rowEmail === normalizeEmail(email);
 }
 
-export type RoleLookup = (email: string) => Promise<{ status: number; body: unknown }>;
-
 /**
- * The whole decision with an injected role lookup (the portal client in production, a stub in tests).
- * The lookup only runs for an allowlisted email: the portal never hears about strangers.
+ * The whole decision with an injected role lookup (the users repo on MongoDB in production, a stub in tests).
+ * The lookup only runs for an allowlisted email: the database is never asked about strangers.
  */
-export async function decideAdmin(
-  email: string | null | undefined,
-  allowlist: Set<string>,
-  lookupRole: RoleLookup
-): Promise<GateDecision> {
+export async function decideAdmin(email: string | null | undefined, allowlist: Set<string>, lookupRole: RoleLookup): Promise<GateDecision> {
   const e = normalizeEmail(email);
   if (!e) return { admin: false, email: null, reason: "signed-out" };
   if (!allowlist.has(e)) return { admin: false, email: e, reason: "not-allowlisted" };
-  let res: { status: number; body: unknown };
+  let row: RoleRow;
   try {
-    res = await lookupRole(e);
+    row = await lookupRole(e);
   } catch {
-    return { admin: false, email: e, reason: "portal-unavailable" };
+    return { admin: false, email: e, reason: "db-unavailable" };
   }
-  if (res.status >= 500 || res.status === 0) return { admin: false, email: e, reason: "portal-unavailable" };
-  if (!portalConfirmsAdmin(e, res.status, res.body)) return { admin: false, email: e, reason: "portal-role" };
-  return { admin: true, email: e, role: "admin" };
+  if (!rowConfirmsAdmin(e, row)) return { admin: false, email: e, reason: "not-admin-role" };
+  return { admin: true, email: e, role: "admin", id: row.id };
 }
 
 /** Short, non-secret wording for the "Not an admin" page and /api/me. */
-export function gateReasonText(reason: Exclude<GateDecision, { admin: true }>["reason"]): string {
+export function gateReasonText(reason: GateRefusal): string {
   switch (reason) {
     case "signed-out":
       return "Sign in to continue.";
     case "not-allowlisted":
       return "This account is not on the admin list.";
-    case "portal-role":
-      return "The portal does not hold the admin role for this account.";
-    case "portal-unavailable":
-      return "The portal could not confirm the admin role (unreachable, or it rejected the console's service token). Try again in a moment.";
+    case "not-admin-role":
+      return "This account does not hold the admin role in the platform database.";
+    case "db-unavailable":
+      return "The platform database could not be reached to confirm the admin role. Try again in a moment.";
   }
 }

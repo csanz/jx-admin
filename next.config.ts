@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // The waitlist moved under Users in the sidebar; old links keep working (the query string is carried over).
+  async redirects() {
+    return [
+      { source: "/waitlist", destination: "/users/waitlist", permanent: true },
+      // the Assets section has one item so far
+      { source: "/assets", destination: "/assets/catalog", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

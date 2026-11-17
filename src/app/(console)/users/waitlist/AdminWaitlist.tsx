@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { errorText, when } from "@/lib/format";
+import { PageHeader } from "@/components/PageHeader";
 
 type Status = "waitlist" | "approved";
 type Row = {
@@ -24,7 +25,7 @@ function EmailNote({ status }: { status: string | null | undefined }) {
 }
 type Data = { counts: { waiting: number; approved: number }; users: Row[] };
 
-export function AdminWaitlist({ adminEmail }: { adminEmail: string }) {
+export function AdminWaitlist() {
   const [status, setStatus] = useState<Status>("waitlist");
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -88,13 +89,7 @@ export function AdminWaitlist({ adminEmail }: { adminEmail: string }) {
 
   return (
     <div>
-      <header className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
-        <div>
-          <p className="text-[11px] text-text-subtle uppercase tracking-[0.16em]">Jazaix admin</p>
-          <h1 className="text-2xl text-text font-semibold font-sans tracking-tight">Portal waitlist</h1>
-        </div>
-        <p className="text-xs text-text-subtle">{adminEmail}</p>
-      </header>
+      <PageHeader path="/users/waitlist" title="Waitlist" />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         {tab("waitlist", "Waiting", data?.counts.waiting)}

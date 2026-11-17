@@ -7,5 +7,5 @@ export const metadata = { title: "JBux" };
 
 export default function JbuxPage() {
   // The report reads MongoDB; the two money actions need the portal link (JX_PORTAL_URL + JX_ADMIN_API_TOKEN).
-  return gatedPage((actor) => <JbuxConsole adminEmail={actor.email} portalLinked={portalLinked()} />);
+  return gatedPage(() => <JbuxConsole portalLinked={portalLinked()} />);
 }

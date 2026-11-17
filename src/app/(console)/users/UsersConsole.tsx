@@ -7,12 +7,14 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { errorText, when } from "@/lib/format";
+import { PageHeader } from "@/components/PageHeader";
 
 type Row = {
   id: string; email: string; name: string; username: string; image: string; role: string; access: "approved" | "waitlist";
   createdAt: string | null; lastLoginAt: string | null;
 };
 type Data = { users: Row[]; total: number };
+const PAGE = 50;
 
 /** The roles an admin can set; "user" is the UI's word for the portal's "player". */
 const ROLE_OPTIONS = [
@@ -31,6 +33,7 @@ export function UsersConsole({ adminEmail, adminId }: { adminEmail: string; admi
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [picked, setPicked] = useState<Record<string, string>>({});
+  const [more, setMore] = useState(false);
 
   // the search waits for a pause in typing
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 250); return () => clearTimeout(t); }, [q]);
@@ -48,6 +51,28 @@ export function UsersConsole({ adminEmail, adminId }: { adminEmail: string; admi
     }
   }, [query]);
   useEffect(() => { void load(); }, [load]);
+
+  // the "more" control: the next page of 50, appended
+  const loadMore = async () => {
+    if (!data) return;
+    setMore(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/users?q=${encodeURIComponent(query)}&skip=${data.users.length}`, { cache: "no-store" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(errorText(res.status, body));
+      const next = body as Data;
+      setData((d) => {
+        if (!d) return next;
+        const seen = new Set(d.users.map((u) => u.id));
+        return { users: [...d.users, ...next.users.filter((u) => !seen.has(u.id))], total: next.total };
+      });
+    } catch (e) {
+      setError(`Could not load more users (${(e as Error).message}).`);
+    } finally {
+      setMore(false);
+    }
+  };
 
   const setRole = async (row: Row) => {
     const role = picked[row.id];
@@ -74,13 +99,7 @@ export function UsersConsole({ adminEmail, adminId }: { adminEmail: string; admi
 
   return (
     <div>
-      <header className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
-        <div>
-          <p className="text-[11px] text-text-subtle uppercase tracking-[0.16em]">Jazaix admin</p>
-          <h1 className="text-2xl text-text font-semibold font-sans tracking-tight">Users</h1>
-        </div>
-        <p className="text-xs text-text-subtle">{adminEmail}</p>
-      </header>
+      <PageHeader path="/users" title="Users" />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <input
@@ -172,7 +191,14 @@ export function UsersConsole({ adminEmail, adminId }: { adminEmail: string; admi
           </tbody>
         </table>
       </div>
-      {data && data.users.length >= 50 && <p className="mt-2 text-xs text-text-subtle">Showing the first 50. Search to narrow it down.</p>}
+      {data && data.users.length < data.total && data.users.length >= PAGE && (
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" onClick={() => void loadMore()} disabled={more} className="px-3 py-1.5 text-sm text-text-muted border border-border rounded-md hover:text-text disabled:opacity-50 cursor-pointer">
+            {more ? "Loading..." : `Show ${Math.min(PAGE, data.total - data.users.length)} more`}
+          </button>
+          <p className="text-xs text-text-subtle">{data.users.length.toLocaleString()} of {data.total.toLocaleString()}</p>
+        </div>
+      )}
     </div>
   );
 }

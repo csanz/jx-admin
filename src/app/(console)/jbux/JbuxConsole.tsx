@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { errorText, num, when } from "@/lib/format";
+import { PageHeader } from "@/components/PageHeader";
 
 const FUNDINGS = ["real", "test", "promo"] as const;
 const KINDS = ["grant", "purchase", "spend", "refund", "reversal", "adjust"] as const;
@@ -40,7 +41,7 @@ async function postJson(path: string, body: unknown): Promise<{ ok: boolean; sta
 
 const NOT_LINKED = "Money actions need the portal link (the portal URL and service token in the console's environment).";
 
-export function JbuxConsole({ adminEmail, portalLinked }: { adminEmail: string; portalLinked: boolean }) {
+export function JbuxConsole({ portalLinked }: { portalLinked: boolean }) {
   const [funding, setFunding] = useState("");
   const [kind, setKind] = useState("");
   const [from, setFrom] = useState("");
@@ -72,13 +73,7 @@ export function JbuxConsole({ adminEmail, portalLinked }: { adminEmail: string; 
 
   return (
     <div>
-      <header className="flex flex-wrap items-baseline justify-between gap-2 mb-6">
-        <div>
-          <p className="text-[11px] text-text-subtle uppercase tracking-[0.16em]">Jazaix admin</p>
-          <h1 className="text-2xl text-text font-semibold font-sans tracking-tight">JBux</h1>
-        </div>
-        <p className="text-xs text-text-subtle">{adminEmail}</p>
-      </header>
+      <PageHeader path="/jbux" title="JBux report" />
 
       <section aria-labelledby="report-h">
         <h2 id="report-h" className="text-base text-text font-semibold mb-3">Ledger report</h2>

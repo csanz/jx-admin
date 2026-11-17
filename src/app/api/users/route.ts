@@ -1,6 +1,6 @@
 /**
  * Users, on the platform database directly (src/lib/repo/users.ts).
- *   GET  /api/users?q=                 -> { users: [...], total } (email, username or name; at most 50, newest first)
+ *   GET  /api/users?q=&skip=           -> { users: [...], total, skip } (email, username or name; 50 a page, newest first)
  *   POST /api/users { userId, role }   -> { user, changed } (role: admin | developer | user; "user" is stored as the
  *                                         portal's "player")
  * Admin gate on both, same-origin JSON on the write. The signed-in admin cannot demote themselves (409
@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
   const g = await requireAdminApi(req, { write: false });
   if (!g.ok) return g.res;
   const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 80);
-  const r = await withDb(async () => searchUsers(await mongoDb(), q));
+  const skip = req.nextUrl.searchParams.get("skip") ?? "0";
+  const r = await withDb(async () => searchUsers(await mongoDb(), q, skip));
   if (!r.ok) return r.res;
   return jsonOk(r.value);
 }

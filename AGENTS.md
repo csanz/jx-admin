@@ -30,7 +30,8 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
    Exceptions, by name: `/api/auth/*` and `/api/health`. Non-admins see "Not an admin".
 3. Data: the official `mongodb` driver, one cached client in `src/lib/mongo.ts` (globalThis, serverless-safe,
    `serverSelectionTimeoutMS` 5000, never created at import time), env `MONGODB_URI` + `MONGODB_DB` (default
-   `jx_portal`). EVERY read and write lives in `src/lib/repo/*.ts` (users, waitlist, jbux-report, audit): plain
+   `jx_portal`). EVERY read and write lives in `src/lib/repo/*.ts` (users, waitlist, jbux-report, audit, games,
+   catalog, plus the paging and values helpers): plain
    modules that take a `Db`, no framework imports, no `process.env`, so node tests them directly. The fields written
    are the portal's (access, approvedAt, approvedBy, waitlistedAt, waitlistEmails, role), so the portal keeps working
    against the same rows. Every write appends an `admin_actions` document
@@ -47,6 +48,17 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
 7. Logic that is tested lives in plain `.ts` modules under `src/lib` with no JSX and explicit `.ts` import extensions,
    so node 26 runs them directly (`erasableSyntaxOnly` is on: no enums, no parameter properties). Route handlers keep
    the same-origin JSON check on writes (`src/lib/same-origin.ts`); pages read the session server-side.
+
+8. Navigation: the sidebar tree is declared in ONE place, `src/lib/nav.ts` (sections and their items). A new section
+   or item is added there, with its page under `src/app/(console)/`; the sidebar, the active highlight and the page
+   header crumb follow from it. EVERY page lives inside the shell: under the `(console)` route group (its layout
+   renders `<Shell>`), renders through `gatedPage`, and starts with `<PageHeader path=... title=... />`. Only
+   `/sign-in` sits outside. Pages are server components that read through the repos (`loadForPage` turns an
+   unreachable database into a visible message); a client component only where interaction needs it. Lists page at
+   50 (`src/lib/repo/paging.ts`) with a "more" control. `test/shell-layout.test.mjs` pins the tree, the group, the
+   gate, the README routes and the `/waitlist` redirect. Add the route to the README "Navigation" table.
+9. Games, catalog and audit are read only. `game_keys` is read with a projection of label, environment, status and
+   createdAt only: a key value (or its prefix) never leaves the database (`test/repo-games.test.mjs`).
 
 ## Checks before a push
 ```

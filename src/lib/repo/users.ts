@@ -9,6 +9,8 @@
  */
 import { ObjectId, type Db } from "mongodb";
 import { recordAdminAction } from "./audit.ts";
+import { parseSkip } from "./paging.ts";
+import { regexEscape } from "./values.ts";
 
 /** The roles the console can set. "player" is what the portal stores for an ordinary user (the UI says "user"). */
 export const SETTABLE_ROLES = ["admin", "developer", "player"] as const;
@@ -93,10 +95,8 @@ export function userView(u: UserDoc): UserView {
   };
 }
 
-/** Escape a search string for a case-insensitive Mongo regex (never a pattern from the caller). */
-export function regexEscape(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+/** Escape a search string for a case-insensitive Mongo regex (never a pattern from the caller). Lives in values.ts. */
+export { regexEscape };
 
 export function normalizeEmail(email: string | null | undefined): string | null {
   if (typeof email !== "string") return null;
@@ -132,15 +132,16 @@ export function userSearchFilter(q: unknown): Record<string, unknown> {
   return { $or: [{ email: re }, { username: re }, { name: re }] };
 }
 
-/** Up to USER_SEARCH_LIMIT users matching q, newest first. */
-export async function searchUsers(db: Db, q: unknown): Promise<{ users: UserView[]; total: number }> {
+/** A page of USER_SEARCH_LIMIT users matching q, newest first, starting at `skip` (the list's "more" control). */
+export async function searchUsers(db: Db, q: unknown, skip: unknown = 0): Promise<{ users: UserView[]; total: number; skip: number }> {
   const users = db.collection<UserDoc>("users");
   const filter = userSearchFilter(q);
+  const from = parseSkip(skip);
   const [total, list] = await Promise.all([
     users.countDocuments(filter),
-    users.find(filter, { projection: USER_PROJECTION }).sort({ createdAt: -1, _id: -1 }).limit(USER_SEARCH_LIMIT).toArray(),
+    users.find(filter, { projection: USER_PROJECTION }).sort({ createdAt: -1, _id: -1 }).skip(from).limit(USER_SEARCH_LIMIT).toArray(),
   ]);
-  return { users: list.map(userView), total };
+  return { users: list.map(userView), total, skip: from };
 }
 
 // ── SET ROLE ───────────────────────────────────────────────────────────────────────────────────────────────────

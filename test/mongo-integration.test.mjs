@@ -12,6 +12,9 @@ import { AUDIT_COLLECTION } from "../src/lib/repo/audit.ts";
 import { findUserRoleByEmail, searchUsers, setUserRole } from "../src/lib/repo/users.ts";
 import { applyWaitlistAction, listWaitlist, waitlistCounts } from "../src/lib/repo/waitlist.ts";
 import { getJbuxReport } from "../src/lib/repo/jbux-report.ts";
+import { getGameDetail, listGames } from "../src/lib/repo/games.ts";
+import { listCatalog } from "../src/lib/repo/catalog.ts";
+import { listAuditActions } from "../src/lib/repo/audit.ts";
 
 const URI = process.env.JX_TEST_MONGO_URI || "";
 const skip = URI ? false : "JX_TEST_MONGO_URI is not set";
@@ -191,4 +194,40 @@ test("JBux report: real, test and promo money stay apart; splits, debits, legacy
   assert.deepEqual(window.byFunding.test, { credited: 30, debited: 0 });
   // the wallet pots are the live totals, whatever the ledger filter
   assert.deepEqual(window.wallets, r.wallets);
+});
+
+test("games: list, search, sort and one game with keys (no key values), join requests and rooms", { skip }, async () => {
+  const gid = new ObjectId();
+  await db.collection("games").insertMany([
+    { _id: gid, slug: "it-game", name: "Integration Game", creator_name: "owner", creator_id: ADMIN_ID, plays: 9, rounds_completed: 1, updatedAt: NOW, studio_enabled: true },
+    { slug: "it-other", name: "Other", creator_name: "gamer", plays: 1, rounds_completed: 7, updatedAt: new Date(NOW.getTime() - 1000) },
+  ]);
+  await db.collection("game_keys").insertMany([
+    { key: "gk_dev_INTEGRATION_SECRET", prefix: "gk_dev_zz", game_id: gid, game_slug: "it-game", label: "local", environment: "dev", status: "active", createdAt: NOW },
+  ]);
+  await db.collection("game_join_requests").insertOne({ gameId: gid.toString(), userId: WAIT_A.toString(), status: "pending", createdAt: NOW });
+  await db.collection("rooms").insertMany([
+    { _id: "it-room-1", room_id: "it-room-1", game_id: "it-game", game_slug: "it-game", state: "open", players: 2, updatedAt: NOW },
+    { _id: "it-room-2", room_id: "it-room-2", game_id: "it-game", game_slug: null, state: "closed", updatedAt: new Date(NOW.getTime() - 5000) },
+  ]);
+  assert.deepEqual((await listGames(db, { sort: "plays" })).rows.map((g) => g.slug), ["it-game", "it-other"]);
+  assert.deepEqual((await listGames(db, { sort: "rounds" })).rows.map((g) => g.slug), ["it-other", "it-game"]);
+  assert.deepEqual((await listGames(db, { q: "GAMER" })).rows.map((g) => g.slug), ["it-other"]);
+  const d = await getGameDetail(db, "it-game");
+  assert.equal(d.keys.count, 1);
+  assert.doesNotMatch(JSON.stringify(d), /INTEGRATION_SECRET|gk_dev_zz/);
+  assert.equal(d.joinRequests.items[0].email, "a@example.com");
+  assert.deepEqual(d.rooms.map((r) => r.room_id), ["it-room-1", "it-room-2"]);
+  assert.equal(await getGameDetail(db, "missing"), null);
+});
+
+test("catalog and audit lists read their collections", { skip }, async () => {
+  await db.collection("catalog").insertOne({ sku: "it-sku", name: "Item", kind: "avatar-item", gameId: "it-game", priceCredits: 5, enabled: true, createdAt: NOW });
+  const c = await listCatalog(db);
+  assert.equal(c.total, 1);
+  assert.equal(c.columns[0], "sku");
+  await db.collection(AUDIT_COLLECTION).insertOne({ at: new Date(NOW.getTime() + 60_000), actor: "zz-integration@jazaix.com", action: "set-role", target: "t", via: "admin-console" });
+  const a = await listAuditActions(db, { actor: "ZZ-INTEGRATION" });
+  assert.equal(a.total, 1);
+  assert.equal(a.rows[0].actor, "zz-integration@jazaix.com");
 });

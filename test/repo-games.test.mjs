@@ -83,7 +83,7 @@ test("getGameDetail: the game's fields, counters and related rows; unknown or ma
     { _id: new ObjectId(), key: "gk_dev_OTHER_GAME", game_id: OSA, game_slug: "one-shot-arena", label: "osa", createdAt: new Date() },
   ];
   const rooms = Array.from({ length: 30 }, (_, i) => ({ _id: `room${i}`, room_id: `room${i}`, game_id: "last-minute", game_slug: i % 2 ? "last-minute" : null, state: "open", players: i, updatedAt: new Date(Date.UTC(2026, 10, 1, 0, i)), created_at: new Date(Date.UTC(2026, 10, 1)) }));
-  rooms.push({ _id: "other", game_id: "fps-arena", game_slug: null, updatedAt: new Date(Date.UTC(2027, 0, 1)) });
+  rooms.push({ _id: "other", game_id: "standard", game_slug: null, updatedAt: new Date(Date.UTC(2027, 0, 1)) });
   const db = fakeDb({
     games: games(),
     game_keys: keyDocs,

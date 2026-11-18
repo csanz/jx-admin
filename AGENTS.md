@@ -31,7 +31,7 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
 3. Data: the official `mongodb` driver, one cached client in `src/lib/mongo.ts` (globalThis, serverless-safe,
    `serverSelectionTimeoutMS` 5000, never created at import time), env `MONGODB_URI` + `MONGODB_DB` (default
    `jx_portal`). EVERY read and write lives in `src/lib/repo/*.ts` (users, user-detail, waitlist, jbux-report, jbux-sales,
-   audit, games, rooms, catalog, plus the paging and values helpers): plain
+   analytics, audit, games, rooms, catalog, plus the paging and values helpers): plain
    modules that take a `Db`, no framework imports, no `process.env`, so node tests them directly. The fields written
    are the portal's (access, approvedAt, approvedBy, waitlistedAt, waitlistEmails, role), so the portal keeps working
    against the same rows. Every write appends an `admin_actions` document
@@ -69,6 +69,9 @@ money actions (JBux refund, wallet hold) still go to the portal's admin API with
    `overflow-x-auto` / `overflow-auto` anywhere (test/avatar-theme-layout.test.mjs). User pictures render only
    through `<Avatar>` (onError falls back to the initial). Server-paged lists use `numberedPage` + `<Pager>`
    (previous / next, page n of m).
+11. Charts: Recharts (exact pin) only inside `src/components/charts/*` client components, which import nothing but
+   react and recharts and take finished points from the server page; colours only through the `.jx-chart` token
+   rules in globals.css. Aggregations live in `src/lib/repo/analytics.ts` (UTC days, zero fill in code).
 
 ## Checks before a push
 ```

@@ -60,7 +60,7 @@ once, in `src/lib/nav.ts`; every page lives in the `src/app/(console)` route gro
 
 | Sidebar | Route | What it shows |
 | --- | --- | --- |
-| Overview | `/` | the four counts (waiting, approved, accounts, real JBux) and the 10 newest admin actions |
+| Overview | `/` | analytics home: the four counts in one row, a 7 / 30 / 90 day switch (`?range=`), eight line charts (players, sessions seated vs watching, play hours, rounds, peak concurrent, new accounts, JBux spent by pot + purchases, client errors vs reports), the per-game table for the range, the 5 newest admin actions |
 | Users > List | `/users` | search by email / username / name, role, waitlist state, set role; 50 a page, "more"; each row opens the user |
 | (User detail) | `/users/[id]` | every field of the users row (token / secret / hash fields redacted), role (settable), waitlist state, wallet summary, sign-ins (first + latest: all the portal stores), play history and game sessions (50 a page each) |
 | Users > Waitlist | `/users/waitlist` | waiting and approved, approve, move back (`/waitlist` redirects here) |
@@ -82,6 +82,20 @@ long values wrap or truncate with the full value in a tooltip, short dates); the
 anywhere (`test/avatar-theme-layout.test.mjs` pins it). Avatars fall back to the portal's own fallback, the first
 letter on the surface colour, when a user has no picture or it fails to load; a portal-stored photo
 (`/api/images/...`) is loaded from `JX_PORTAL_URL` when that is set.
+
+## Analytics (the overview)
+- `src/lib/repo/analytics.ts` aggregates on the server, one pipeline per source, bucketed by UTC day
+  (`$toDate` on the stored field, so a Date or an ISO string both work, then `$dateToString` in UTC); the code fills
+  missing days with zeros. Players, sessions, play time and rounds fall back to `daily_stats` when the raw collection
+  is empty for the range (the chart says "from daily_stats"). Bot sessions and bot accounts are left out.
+- Charts: Recharts (pinned `recharts@3.10.1`) in one client component, `src/components/charts/LineChartPanel.tsx`,
+  which receives the finished points from the server page (no API round trip; the range is the query string).
+  Colours come only from the theme tokens through the `.jx-chart` rules in `globals.css` (series 1 = the admin accent,
+  2 = text-muted, 3 = text-subtle dashed), so both themes follow.
+- **To add a series**: add a pipeline (or a field to an existing one) in `getAnalytics` that returns
+  `{ _id: "YYYY-MM-DD", <field>: n }` rows, `zeroFill(keys, rows, ["<field>"])` it into the result with its total, then
+  add a `<LineChartPanel title=... total=... points=... series={[{ key: "<field>", label: ... }]} />` to
+  `src/app/(console)/page.tsx`. Add a test for any new roll-up in `test/analytics.test.mjs`.
 
 ## JBux figures
 - A **purchase** is a `jbox_receipts` row. Counts include every receipt; JBux sums (spent, gross, revenue) leave
@@ -123,6 +137,7 @@ mobile strip and the sign-in page use it.
 | Section | Reads | Writes |
 | --- | --- | --- |
 | Admin gate | MongoDB `users` (role) | nothing |
+| Overview analytics | MongoDB `game_sessions`, `matches`, `daily_stats`, `users`, `credit_transactions`, `jbox_receipts`, `client_reports`, `games` | nothing |
 | Waitlist | MongoDB `users` | MongoDB `users` (+ `admin_actions`), Resend for the email |
 | Users | MongoDB `users` | MongoDB `users.role` (+ `admin_actions`) |
 | Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails) | nothing |

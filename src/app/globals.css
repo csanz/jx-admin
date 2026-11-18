@@ -94,3 +94,20 @@ h1, h2, h3, h4, h5, h6 {
   mask: url("/brand/jazaix-wordmark.png") no-repeat center / contain;
   aspect-ratio: 313 / 64;
 }
+
+/* Analytics charts (src/components/charts/LineChartPanel.tsx): every colour from the theme tokens, so both themes
+   follow. Series 1 = the admin accent, 2 = text-muted, 3 = text-subtle dashed. */
+.jx-chart .recharts-cartesian-grid line { stroke: var(--color-border-subtle); }
+.jx-chart .recharts-cartesian-axis-tick-value { fill: var(--color-text-subtle); font-size: 11px; font-family: var(--font-mono); }
+.jx-chart .jx-line-1 .recharts-line-curve { stroke: var(--color-admin); }
+.jx-chart .jx-line-2 .recharts-line-curve { stroke: var(--color-text-muted); }
+.jx-chart .jx-line-3 .recharts-line-curve { stroke: var(--color-text-subtle); stroke-dasharray: 3 3; }
+.jx-chart .jx-dot.jx-line-1 { fill: var(--color-admin); stroke: var(--color-surface); }
+.jx-chart .jx-dot.jx-line-2 { fill: var(--color-text-muted); stroke: var(--color-surface); }
+.jx-chart .jx-dot.jx-line-3 { fill: var(--color-text-subtle); stroke: var(--color-surface); }
+.jx-chart .jx-cursor { stroke: var(--color-border); }
+.jx-chart .recharts-tooltip-wrapper { outline: none; }
+.jx-swatch { display: inline-block; width: 10px; height: 2px; border-radius: 1px; }
+.jx-swatch.jx-line-1 { background: var(--color-admin); }
+.jx-swatch.jx-line-2 { background: var(--color-text-muted); }
+.jx-swatch.jx-line-3 { background: repeating-linear-gradient(90deg, var(--color-text-subtle) 0 3px, transparent 3px 6px); }

@@ -47,7 +47,7 @@ function TopList({ title, rows, hrefFor }: { title: string; rows: TopRow[]; href
 export default function PurchasesPage({ searchParams }: { searchParams: SP }) {
   return gatedPage(async () => {
     const sp = await searchParams;
-    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV));
+    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV, process.env.JX_JBUX_DEFAULT_ENV));
     const f = { game: one(sp.game), kind: one(sp.kind), funding: one(sp.funding), state: one(sp.state), sku: one(sp.sku), buyer: one(sp.buyer), from: one(sp.from), to: one(sp.to) };
     const r = await loadForPage("purchases", async () => getPurchases(await mongoDb(), { ...f, env, page: one(sp.page) }));
     const portalUrl = portalUrlIfSet();

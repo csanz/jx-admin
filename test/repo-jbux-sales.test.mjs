@@ -14,6 +14,10 @@ test("env: prod by default on a production deployment, every env elsewhere; all 
   assert.equal(defaultJbuxEnv("production"), "prod");
   assert.equal(defaultJbuxEnv("development"), "");
   assert.equal(defaultJbuxEnv(undefined), "");
+  assert.equal(defaultJbuxEnv("production", "all"), "", "JX_JBUX_DEFAULT_ENV=all shows every env on a production build");
+  assert.equal(defaultJbuxEnv("production", "local"), "local");
+  assert.equal(defaultJbuxEnv("production", "bogus"), "prod", "an unknown override is ignored");
+  assert.equal(defaultJbuxEnv("development", ""), "");
   assert.equal(parseEnv("all", "prod"), "");
   assert.equal(parseEnv("local", "prod"), "local");
   assert.equal(parseEnv("evil", "prod"), "prod");

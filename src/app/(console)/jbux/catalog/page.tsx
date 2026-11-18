@@ -20,7 +20,7 @@ const SORT_LABEL: Record<CatalogSort, string> = { gross: "JBux gross", sales: "S
 export default function JbuxCatalogPage({ searchParams }: { searchParams: SP }) {
   return gatedPage(async () => {
     const sp = await searchParams;
-    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV));
+    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV, process.env.JX_JBUX_DEFAULT_ENV));
     const envParam = env || "all";
     const r = await loadForPage("catalog", async () => catalogWithSales(await mongoDb(), { env, sort: one(sp.sort) }));
     const sort = r.ok ? r.value.sort : "gross";

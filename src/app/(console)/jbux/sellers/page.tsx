@@ -21,7 +21,7 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 export default function SellersPage({ searchParams }: { searchParams: SP }) {
   return gatedPage(async () => {
     const sp = await searchParams;
-    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV));
+    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV, process.env.JX_JBUX_DEFAULT_ENV));
     const envParam = env || "all";
     const r = await loadForPage("sellers", async () => listSellers(await mongoDb(), { env }));
     const portalUrl = portalUrlIfSet();

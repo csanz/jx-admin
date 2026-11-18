@@ -22,7 +22,7 @@ export default function SellerPage({ params, searchParams }: { params: Promise<{
   return gatedPage(async () => {
     const { key } = await params;
     const sp = await searchParams;
-    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV));
+    const env = parseEnv(one(sp.env) || undefined, defaultJbuxEnv(process.env.NODE_ENV, process.env.JX_JBUX_DEFAULT_ENV));
     const envParam = env || "all";
     const path = `/jbux/sellers/${key}`;
     const r = await loadForPage("seller", async () => getSeller(await mongoDb(), key, { env }));

@@ -184,6 +184,7 @@ npm run build       # next build --webpack
    - `JX_DEVELOPER_EMAILS`: comma-separated admin emails (the same list the portal uses).
    - `MONGODB_URI`: the production platform database, reachable from Vercel (see "Production MongoDB" below).
    - `MONGODB_DB`: `jx_portal` (optional, this is the default).
+   - Optional: `JX_JBUX_DEFAULT_ENV` = `all` or one env (`local`, `dev`, `staging`, `prod`): the JBux pages' default env filter (a production build defaults to `prod`; use `all` when reviewing a production build against local data).
    - Optional, both or neither: `JX_PORTAL_URL` = `https://play.jazaix.com` and `JX_ADMIN_API_TOKEN` = a long random
      string. The SAME token value goes into the portal (step 5). Without them, refund and hold are disabled.
    - Optional: `RESEND_API_KEY` (and `JX_EMAIL_FROM`, `JX_EMAIL_REPLY_TO`) for the approval email.

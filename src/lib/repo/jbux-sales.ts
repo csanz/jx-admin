@@ -54,8 +54,12 @@ export const splitText = (s: Split) => `${s.real}/${s.test}/${s.promo}`;
 
 // ── ENV AND RANGE ──────────────────────────────────────────────────────────────────────────────────────────────
 
-/** The env filter's default: prod on a production deployment, every env otherwise (the caller passes NODE_ENV). */
-export function defaultJbuxEnv(nodeEnv: string | undefined): string {
+/** The env filter's default: prod on a production deployment, every env otherwise (the caller passes NODE_ENV).
+ *  JX_JBUX_DEFAULT_ENV overrides it ("all" or one of the portal's envs): a production build reviewed against local data
+ *  (the owner's port 3400) would otherwise open every JBux page empty. */
+export function defaultJbuxEnv(nodeEnv: string | undefined, override?: string): string {
+  if (override === "all") return "";
+  if (override && (JBUX_ENVS as readonly string[]).includes(override)) return override;
   return nodeEnv === "production" ? "prod" : "";
 }
 

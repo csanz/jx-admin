@@ -112,14 +112,14 @@ test("only an admin gets the sidebar: the shell gates first, a non-admin gets th
   const shell = fs.readFileSync(path.join(ROOT, "src/components/Shell.tsx"), "utf8");
   assert.match(shell, /const g = await requireAdminPage\(\)/, "the shell runs the gate itself");
   assert.match(shell, /if \(g\.kind === "signed-out"\) redirect\(SIGN_IN_PAGE\)/);
-  assert.match(shell, /if \(g\.kind === "not-admin"\) \{\s*return \(\s*<PlainFrame>\s*<Forbidden /, "a non-admin gets the plain frame + Forbidden");
+  assert.match(shell, /if \(g\.kind === "not-admin"\) \{\s*return \(\s*<PlainFrame bare>\s*<Forbidden \/>/, "a non-admin gets the bare plain frame + Forbidden");
   assert.match(shell, /if \(g\.kind === "config-error"\) \{\s*return \(\s*<PlainFrame>\s*<ConfigError /);
   // the sidebar frame is mounted once, after every non-admin branch has returned, and the children with it
   const sidebarAt = shell.indexOf("<SidebarFrame");
   const forbiddenAt = shell.indexOf("<Forbidden");
   assert.ok(sidebarAt > forbiddenAt && forbiddenAt > 0, "SidebarFrame renders only on the admin path");
   assert.equal(shell.match(/<SidebarFrame/g).length, 1);
-  assert.match(shell, /<SidebarFrame footer=\{footer\}>\{children\}<\/SidebarFrame>/);
+  assert.match(shell, /<SidebarFrame account=\{account\} theme=\{theme\} signOut=\{signOutAction\}>\s*\{children\}\s*<\/SidebarFrame>/);
   assert.doesNotMatch(shell.slice(0, sidebarAt).replace(/^\s*\*.*$/gm, ""), /\{children\}/, "children never render before the admin branch");
   // the sidebar frame always shows the tree (no showNav switch to get wrong) and the plain frame never imports it
   const frame = fs.readFileSync(path.join(ROOT, "src/components/SidebarFrame.tsx"), "utf8");
@@ -129,7 +129,10 @@ test("only an admin gets the sidebar: the shell gates first, a non-admin gets th
   assert.doesNotMatch(plain, /nav\.ts|SidebarFrame|NAV\b|OVERVIEW/, "the plain frame has no section tree");
   // the wording the owner asked for, and the sign-in page uses the same plain frame
   const gate = fs.readFileSync(path.join(ROOT, "src/components/AdminGate.tsx"), "utf8");
-  assert.match(gate, /Access forbidden/);
+  const forbidden = gate.slice(gate.indexOf("export function Forbidden"), gate.indexOf("export function ConfigError"));
+  assert.match(forbidden, /Access forbidden/);
+  assert.match(forbidden, /href=\{HOME_URL\}/, "a link back to the home page");
+  assert.doesNotMatch(forbidden, /admin|email|message|Sign out/i, "the forbidden page gives nothing away");
   assert.doesNotMatch(gate, /Not an admin/);
   const signIn = fs.readFileSync(path.join(APP, "sign-in/page.tsx"), "utf8");
   assert.match(signIn, /<PlainFrame>/);

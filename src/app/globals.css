@@ -29,8 +29,9 @@
   --color-admin-hover: #ff7a3d;
   --color-admin-ink: #000000;
 
-  /* The shared header band: the sidebar's logo row and every page's crumb row have this height. */
-  --spacing-header: 4rem;
+  /* The shared header band: the rail's logo row (the portal's pt-6 + h-8 mark + pb-4 = 72 px) and every page's crumb
+     row have this height, so the crumb sits on the mark's line. */
+  --spacing-header: 4.5rem;
 }
 
 /* Light theme, verbatim from the portal: every text token clears WCAG AA (4.5:1) on both bg and surface. */

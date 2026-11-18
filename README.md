@@ -12,7 +12,7 @@ have one implementation.
 - **Sign-in**: Auth.js (next-auth v5) with Google only, JWT sessions, no adapter.
 - **Who is an admin**: both must hold. The email is on `JX_DEVELOPER_EMAILS` (comma list, case-insensitive) AND the
   `users` row for that email (looked up lower-cased) holds role `admin`, read from MongoDB on every request (a
-  demotion takes effect at once). Non-admins see a plain "Access forbidden" page with Sign out and no sidebar or links into the console (the shell decides before any page or menu renders); signed-out visitors land on `/sign-in`.
+  demotion takes effect at once). Non-admins see a plain "Access forbidden" page with a link back to jazaix.com and nothing else: no rail, no links into the console, no admin wording, no email (the shell decides before any page or menu renders); signed-out visitors land on `/sign-in`.
 - **Data layer** (`src/lib/mongo.ts` + `src/lib/repo/*.ts`): the official `mongodb` driver (6.x, the portal's
   major), one cached client (serverless-safe, 5 s server selection timeout, never opened at import time), env
   `MONGODB_URI` and `MONGODB_DB` (default `jx_portal`). The repo modules take a `Db` and have no framework imports:
@@ -53,10 +53,17 @@ have one implementation.
   never looks like the portal's black one.
 
 ## Navigation
-A persistent left sidebar (240 px; under 900 px it is a drawer behind the Menu button) lists the top-level objects
-with their items beneath, the active item highlighted. The content sits in the middle under a page header (section
-crumb + title). The signed-in email, the theme toggle and Sign out are at the sidebar bottom. The tree is declared
-once, in `src/lib/nav.ts`; every page lives in the `src/app/(console)` route group, whose layout renders the shell.
+The left rail IS the portal's left rail (jx-portal `LeftRail.tsx` + `AppShell.tsx`, owner 2026-11-17: "same size,
+same colour, same icon, same location; the only difference is that the logo is a different colour"): the surface
+aside, 240 px (72 px collapsed with the panel toggle in the logo row or Ctrl/Cmd+B; a 260 px drawer behind the
+hamburger bar under 768 px), the logo row (pt-6 pb-4, the mark at 32 px), the account chip (the admin's own user
+page), 40 px rows with 20 px stroke icons (`src/components/rail-row.tsx`, the portal's `railRow` and `Icon`), the
+portal's active (`bg-bg text-text`) and hover colours, the dividers, and the theme row in the footer. The admin's
+additions inside that geometry: the active section's items open under it, indented to the label, and a Sign out row
+sits under the theme row. The content sits beside the rail under a page header (section crumb + title). The tree is
+declared once, in `src/lib/nav.ts` (labels, hrefs and icon paths); every page lives in the `src/app/(console)` route
+group, whose layout renders the shell. `test/rail-parity.test.mjs` compares the geometry and colour strings with the
+portal's source when jx-portal is checked out next to this repo.
 
 | Sidebar | Route | What it shows |
 | --- | --- | --- |
@@ -121,17 +128,18 @@ the portal's file and fails when a value drifts.
 
 **The one admin difference**: the admin accent is the brand's secondary colour, the notice orange (`#f25a1a` dark,
 `#c2410c` light), as the `--color-admin` token (`text-admin`, `bg-admin`, `bg-admin-hover`, `text-admin-ink`). It
-colours the JX mark in the sidebar lockup, the active sidebar item, focus rings, links and primary buttons, so an
-admin tab is unmistakable next to the green player portal. Green (`text-success`) stays for success and approved
+colours the JX mark in the rail (the rail's one difference from the portal's), focus rings, links and primary
+buttons, so an admin tab is unmistakable next to the green player portal. Green (`text-success`) stays for success and approved
 states. No component uses the green `accent` classes (a test pins it).
 
 **Lockup**: the portal's JX mark (`public/brand/jx-mark-v2.svg`, inlined in `src/components/Brand.tsx` with
 `fill: currentColor`) in the admin colour, the Jazaix wordmark (cropped from the portal's horizontal logo into
-`public/brand/jazaix-wordmark.png`, drawn as a mask so it takes the text colour) and the ADMIN tag. The sidebar, the
-mobile strip and the sign-in page use it.
+`public/brand/jazaix-wordmark.png`, drawn as a mask so it takes the text colour) and the ADMIN tag, on the sign-in and
+config pages. The rail draws the mark alone, where the portal draws its logo; the forbidden page draws the mark alone
+too, with no wordmark and no tag.
 
-**Header band**: the sidebar's logo row and every page's crumb row are one band of the same height
-(`--spacing-header`, class `h-header`), vertically centred with the same bottom border; the page title starts below.
+**Header band**: the rail's logo row (the portal's 24 + 32 + 16 = 72 px) and every page's crumb row are one band of
+the same height (`--spacing-header`, class `h-header`), vertically centred, no border; the page title starts below.
 
 ## What uses what
 | Section | Reads | Writes |

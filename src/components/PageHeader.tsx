@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { activeHref, navTrail } from "@/lib/nav";
 
 /**
- * The page header every console page shows. Its first row is the HEADER BAND: the same height as the sidebar's logo
- * row (the `h-header` token, --spacing-header in globals.css), vertically centred, with the same bottom border, so
- * the section crumb sits on the logo's line on every page. The title (and any controls) follow below the band.
+ * The page header every console page shows. Its first row is the HEADER BAND: the same height as the rail's logo
+ * row (the `h-header` token, --spacing-header in globals.css = the portal's pt-6 + 32 px mark + pb-4), vertically
+ * centred and, like the rail's logo row, without a border, so the section crumb sits on the mark's line on every page. The title (and any controls) follow below the band.
  * `path` is the page's own route; on a detail page (for example /games/<slug>) the item in the crumb links back to its
  * list, and `crumbs` can add deeper steps. No hooks, so client and server components both use it.
  */
@@ -14,7 +14,7 @@ export function PageHeader({ path, title, children, crumbs = [] }: { path: strin
   const itemHref = activeHref(path);
   return (
     <header className="mb-6">
-      <div className="h-header -mx-4 px-4 sm:-mx-8 sm:px-8 flex items-center border-b border-border-subtle">
+      <div className="h-header flex items-center">
         <p className="min-w-0 truncate text-[11px] leading-none text-text-subtle uppercase tracking-[0.16em]">
           {trail ? trail.section : "Jazaix admin"}
           {trail && trail.item !== "Overview" && (

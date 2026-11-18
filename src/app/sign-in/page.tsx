@@ -27,7 +27,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <ThemeToggle initial={theme} />
     </div>
     <section className="max-w-md mx-auto mt-16 bg-surface border border-border rounded-xl p-6">
-      <JxMark className="h-10 w-auto text-admin" />
+      <JxMark className="h-8 w-auto text-admin" />
       <h1 className="text-2xl text-text font-semibold mt-4">Sign in to Jazaix admin</h1>
       <p className="mt-3 text-sm text-text-muted">Admins only. Use the Google account that is on the admin list.</p>
       {errorText && <p role="alert" className="mt-3 text-sm text-danger">{errorText}</p>}

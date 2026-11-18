@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 /**
- * THE JAZAIX LOCKUP, as the portal draws it (jx-portal LeftRail: the JX mark at 32 px), followed by the wordmark
+ * THE JAZAIX LOCKUP, as the portal draws it (jx-portal LeftRail: the JX mark; 24 px here, the owner found 32 px too bulky for the admin), followed by the wordmark
  * from the portal's horizontal logo and the ADMIN tag. The mark is the portal's vector (public/brand/jx-mark-v2.svg,
  * the same path inline) with fill currentColor, so it takes the admin colour (the notice orange) in both themes; the
  * wordmark takes the text colour (.jx-wordmark in globals.css masks public/brand/jazaix-wordmark.png). No hooks: the
@@ -22,7 +22,7 @@ export function JxMark({ className = "h-8 w-auto" }: { className?: string }) {
 export function Brand({ plain = false }: { plain?: boolean }) {
   const body = (
     <>
-      <JxMark className="h-8 w-auto text-admin shrink-0" />
+      <JxMark className="h-6 w-auto text-admin shrink-0" />
       <span className="jx-wordmark h-3.5 text-text" role="img" aria-label="Jazaix" />
       <span className="text-[11px] leading-none uppercase tracking-[0.16em] text-admin">Admin</span>
     </>

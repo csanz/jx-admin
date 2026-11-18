@@ -66,8 +66,9 @@ test("the lockup: the portal's JX mark in currentColor, admin coloured, wordmark
   assert.ok(brand.includes(d), "the inline path is the portal's mark");
   assert.ok(fs.existsSync(path.join(ROOT, "public/brand/jazaix-wordmark.png")));
   assert.match(read("src/components/SidebarFrame.tsx"), /<Brand \/>/);
-  assert.match(read("src/app/sign-in/page.tsx"), /<Brand plain \/>/);
-  assert.doesNotMatch(brand + read("src/app/sign-in/page.tsx"), /play\.jazaix\.com/, "no hotlinking the portal");
+  assert.match(read("src/components/PlainFrame.tsx"), /<Brand plain \/>/);
+  assert.match(read("src/app/sign-in/page.tsx"), /<PlainFrame>/);
+  assert.doesNotMatch(brand + read("src/app/sign-in/page.tsx") + read("src/components/PlainFrame.tsx"), /play\.jazaix\.com/, "no hotlinking the portal");
 });
 
 test("one header band: the sidebar logo row, the page crumb row and the sign-in strip share h-header", () => {
@@ -76,7 +77,7 @@ test("one header band: the sidebar logo row, the page crumb row and the sign-in 
   assert.match(frame, /h-header px-4 flex items-center justify-between border-b border-border-subtle/);
   assert.doesNotMatch(frame, /py-6/, "no top padding above the page header band");
   assert.match(read("src/components/PageHeader.tsx"), /h-header [^"]*flex items-center border-b border-border-subtle/);
-  assert.match(read("src/app/sign-in/page.tsx"), /h-header /);
+  assert.match(read("src/components/PlainFrame.tsx"), /h-header /);
 });
 
 test("avatars: absolute https kept, portal paths resolved against the portal, else the fallback; onError swaps", () => {

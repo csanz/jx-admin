@@ -63,7 +63,7 @@ export async function decideAdmin(email: string | null | undefined, allowlist: S
   return { admin: true, email: e, role: "admin", id: row.id };
 }
 
-/** Short, non-secret wording for the "Not an admin" page and /api/me. */
+/** Short, non-secret wording for the "Access forbidden" page and /api/me. */
 export function gateReasonText(reason: GateRefusal): string {
   switch (reason) {
     case "signed-out":

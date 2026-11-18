@@ -3,7 +3,8 @@
 /**
  * The shell's interactive part: the left sidebar (the tree from src/lib/nav.ts, the active item highlighted, each
  * section expanded by default and collapsible), the content pane in the middle, and under 900 px a drawer behind a
- * menu button. The account block (theme, email, Sign out) comes in as `footer` from the server Shell.
+ * menu button. The account block (theme, email, Sign out) comes in as `footer` from the server Shell, which mounts
+ * this frame ONLY for an admin (a non-admin gets src/components/PlainFrame.tsx and never sees the tree).
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -11,7 +12,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { NAV, OVERVIEW, activeHref } from "@/lib/nav";
 import { Brand } from "./Brand";
 
-export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; footer: ReactNode; children: ReactNode }) {
+export function SidebarFrame({ footer, children }: { footer: ReactNode; children: ReactNode }) {
   const pathname = usePathname() ?? "/";
   const active = activeHref(pathname);
   const [open, setOpen] = useState(false);
@@ -63,43 +64,40 @@ export function SidebarFrame({ showNav, footer, children }: { showNav: boolean; 
             Close
           </button>
         </div>
-        {showNav && (
-          <nav aria-label="Sections" className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
-            <Link href={OVERVIEW.href} className={linkClass(OVERVIEW.href, false)} aria-current={active === OVERVIEW.href ? "page" : undefined}>
-              {OVERVIEW.label}
-            </Link>
-            {NAV.map((s) => {
-              const isOpen = !collapsed[s.label];
-              const listId = `nav-${s.label.toLowerCase()}`;
-              return (
-                <div key={s.label}>
-                  <button
-                    type="button"
-                    onClick={() => setCollapsed((c) => ({ ...c, [s.label]: isOpen }))}
-                    aria-expanded={isOpen}
-                    aria-controls={listId}
-                    className="w-full flex items-center justify-between px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-text-subtle hover:text-text cursor-pointer"
-                  >
-                    <span>{s.label}</span>
-                    <span aria-hidden="true">{isOpen ? "-" : "+"}</span>
-                  </button>
-                  {isOpen && (
-                    <ul id={listId} className="mt-0.5 space-y-0.5">
-                      {s.items.map((i) => (
-                        <li key={i.href}>
-                          <Link href={i.href} className={linkClass(i.href, true)} aria-current={active === i.href ? "page" : undefined}>
-                            {i.label}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
-        )}
-        {!showNav && <div className="flex-1" />}
+        <nav aria-label="Sections" className="flex-1 overflow-y-auto px-2 py-3 space-y-3">
+          <Link href={OVERVIEW.href} className={linkClass(OVERVIEW.href, false)} aria-current={active === OVERVIEW.href ? "page" : undefined}>
+            {OVERVIEW.label}
+          </Link>
+          {NAV.map((s) => {
+            const isOpen = !collapsed[s.label];
+            const listId = `nav-${s.label.toLowerCase()}`;
+            return (
+              <div key={s.label}>
+                <button
+                  type="button"
+                  onClick={() => setCollapsed((c) => ({ ...c, [s.label]: isOpen }))}
+                  aria-expanded={isOpen}
+                  aria-controls={listId}
+                  className="w-full flex items-center justify-between px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-text-subtle hover:text-text cursor-pointer"
+                >
+                  <span>{s.label}</span>
+                  <span aria-hidden="true">{isOpen ? "-" : "+"}</span>
+                </button>
+                {isOpen && (
+                  <ul id={listId} className="mt-0.5 space-y-0.5">
+                    {s.items.map((i) => (
+                      <li key={i.href}>
+                        <Link href={i.href} className={linkClass(i.href, true)} aria-current={active === i.href ? "page" : undefined}>
+                          {i.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </nav>
         <div className="shrink-0 border-t border-border-subtle px-4 py-3">{footer}</div>
       </aside>
 

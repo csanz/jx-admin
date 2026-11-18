@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Brand, JxMark } from "@/components/Brand";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { JxMark } from "@/components/Brand";
+import { PlainFrame } from "@/components/PlainFrame";
 import { sessionEmail, signIn } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -18,14 +17,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   if (await sessionEmail()) redirect("/");
   const { error } = await searchParams;
   const errorText = error ? ERROR_TEXT[error] ?? "Sign-in failed. Try again." : null;
-  const theme = (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
-  // The only page outside the console shell: a slim strip with the mark and the theme toggle, then the card.
+  // The only page outside the console shell: the plain frame (strip with the mark and the theme toggle), then the card.
   return (
-    <>
-    <div className="h-header px-4 sm:px-8 flex items-center justify-between border-b border-border-subtle">
-      <Brand plain />
-      <ThemeToggle initial={theme} />
-    </div>
+    <PlainFrame>
     <section className="max-w-md mx-auto mt-16 bg-surface border border-border rounded-xl p-6">
       <JxMark className="h-8 w-auto text-admin" />
       <h1 className="text-2xl text-text font-semibold mt-4">Sign in to Jazaix admin</h1>
@@ -43,6 +37,6 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         </button>
       </form>
     </section>
-    </>
+    </PlainFrame>
   );
 }

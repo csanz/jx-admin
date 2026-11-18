@@ -1,6 +1,7 @@
 /**
  * THE ADMIN GATE, wired. Every page and every route handler goes through here:
- *   requireAdminPage()            for server components: the decision (the page redirects or renders "Not an admin")
+ *   requireAdminPage()            for server components: the decision (the shell and the page redirect or render
+ *                                 "Access forbidden"); cached per request, so the shell and the page share one read
  *   requireAdminApi(req, {write}) for route handlers: the admin, or the JSON response to return
  *                                 (401 signed out, 403 not an admin or a cross-site write, 500 config missing,
  *                                  504 database unreachable)
@@ -8,6 +9,7 @@
  * on every request through src/lib/repo/users.ts. test/routes-import-gate.test.mjs pins that every src/app/api
  * route imports this module.
  */
+import { cache } from "react";
 import { NextResponse, type NextRequest } from "next/server";
 import { sessionEmail } from "./auth.ts";
 import { decideAdmin, gateReasonText, parseAllowlist, type GateDecision } from "./admin-gate.ts";
@@ -35,8 +37,11 @@ export type PageGate =
   | { kind: "not-admin"; email: string; message: string }
   | { kind: "config-error"; missing: string[] };
 
-/** For pages. Never throws: a missing config becomes a visible "config-error" page instead of a blank 500. */
-export async function requireAdminPage(): Promise<PageGate> {
+/**
+ * For the shell and the pages. Never throws: a missing config becomes a visible "config-error" page instead of a
+ * blank 500. React's cache() dedupes it within one request (the shell layout and the page both call it).
+ */
+export const requireAdminPage = cache(async function requireAdminPage(): Promise<PageGate> {
   let d: GateDecision;
   try {
     d = await adminDecision();
@@ -50,7 +55,7 @@ export async function requireAdminPage(): Promise<PageGate> {
   if (d.admin) return { kind: "admin", actor: { id: d.id, email: d.email, role: d.role } };
   if (d.reason === "signed-out") return { kind: "signed-out" };
   return { kind: "not-admin", email: d.email ?? "", message: gateReasonText(d.reason) };
-}
+});
 
 const NO_STORE = { "Cache-Control": "no-store" };
 

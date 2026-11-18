@@ -107,3 +107,34 @@ test("the favicon is the orange Jazaix mark, referenced from the root layout", (
   assert.equal(png.subarray(1, 4).toString("latin1"), "PNG");
   assert.equal(fs.existsSync(path.join(APP, "favicon.ico")), false, "no app/favicon.ico overriding it");
 });
+
+test("only an admin gets the sidebar: the shell gates first, a non-admin gets the plain forbidden page with no tree", () => {
+  const shell = fs.readFileSync(path.join(ROOT, "src/components/Shell.tsx"), "utf8");
+  assert.match(shell, /const g = await requireAdminPage\(\)/, "the shell runs the gate itself");
+  assert.match(shell, /if \(g\.kind === "signed-out"\) redirect\(SIGN_IN_PAGE\)/);
+  assert.match(shell, /if \(g\.kind === "not-admin"\) \{\s*return \(\s*<PlainFrame>\s*<Forbidden /, "a non-admin gets the plain frame + Forbidden");
+  assert.match(shell, /if \(g\.kind === "config-error"\) \{\s*return \(\s*<PlainFrame>\s*<ConfigError /);
+  // the sidebar frame is mounted once, after every non-admin branch has returned, and the children with it
+  const sidebarAt = shell.indexOf("<SidebarFrame");
+  const forbiddenAt = shell.indexOf("<Forbidden");
+  assert.ok(sidebarAt > forbiddenAt && forbiddenAt > 0, "SidebarFrame renders only on the admin path");
+  assert.equal(shell.match(/<SidebarFrame/g).length, 1);
+  assert.match(shell, /<SidebarFrame footer=\{footer\}>\{children\}<\/SidebarFrame>/);
+  assert.doesNotMatch(shell.slice(0, sidebarAt).replace(/^\s*\*.*$/gm, ""), /\{children\}/, "children never render before the admin branch");
+  // the sidebar frame always shows the tree (no showNav switch to get wrong) and the plain frame never imports it
+  const frame = fs.readFileSync(path.join(ROOT, "src/components/SidebarFrame.tsx"), "utf8");
+  assert.doesNotMatch(frame, /showNav/);
+  assert.match(frame, /<nav aria-label="Sections"/);
+  const plain = fs.readFileSync(path.join(ROOT, "src/components/PlainFrame.tsx"), "utf8");
+  assert.doesNotMatch(plain, /nav\.ts|SidebarFrame|NAV\b|OVERVIEW/, "the plain frame has no section tree");
+  // the wording the owner asked for, and the sign-in page uses the same plain frame
+  const gate = fs.readFileSync(path.join(ROOT, "src/components/AdminGate.tsx"), "utf8");
+  assert.match(gate, /Access forbidden/);
+  assert.doesNotMatch(gate, /Not an admin/);
+  const signIn = fs.readFileSync(path.join(APP, "sign-in/page.tsx"), "utf8");
+  assert.match(signIn, /<PlainFrame>/);
+  // the gate decision is cached per request, so the shell and the page share one database read
+  const req = fs.readFileSync(path.join(ROOT, "src/lib/require-admin.ts"), "utf8");
+  assert.match(req, /import \{ cache \} from "react"/);
+  assert.match(req, /export const requireAdminPage = cache\(/);
+});

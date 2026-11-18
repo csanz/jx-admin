@@ -12,7 +12,7 @@ have one implementation.
 - **Sign-in**: Auth.js (next-auth v5) with Google only, JWT sessions, no adapter.
 - **Who is an admin**: both must hold. The email is on `JX_DEVELOPER_EMAILS` (comma list, case-insensitive) AND the
   `users` row for that email (looked up lower-cased) holds role `admin`, read from MongoDB on every request (a
-  demotion takes effect at once). Non-admins see "Not an admin" with Sign out; signed-out visitors land on `/sign-in`.
+  demotion takes effect at once). Non-admins see a plain "Access forbidden" page with Sign out and no sidebar or links into the console (the shell decides before any page or menu renders); signed-out visitors land on `/sign-in`.
 - **Data layer** (`src/lib/mongo.ts` + `src/lib/repo/*.ts`): the official `mongodb` driver (6.x, the portal's
   major), one cached client (serverless-safe, 5 s server selection timeout, never opened at import time), env
   `MONGODB_URI` and `MONGODB_DB` (default `jx_portal`). The repo modules take a `Db` and have no framework imports:

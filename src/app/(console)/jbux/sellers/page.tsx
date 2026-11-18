@@ -50,11 +50,26 @@ export default function SellersPage({ searchParams }: { searchParams: SP }) {
               </tr>
             </thead>
             <tbody>
-              {r.value.map((s) => (
+              {r.value.map((s) => {
+                const sellerHref = `/jbux/sellers/${s.key}${qs({ env: envParam })}`;
+                return (
                 <tr key={s.key} className={BODY_ROW}>
                   <td className={`${TD} text-xs`}>
-                    {s.person ? <PersonCell person={s.person} portalUrl={portalUrl} /> : <span className="text-text">{s.name}</span>}
-                    <Link href={`/jbux/sellers/${s.key}${qs({ env: envParam })}`} className="block text-[11px] text-admin hover:text-admin-hover">Sales by item</Link>
+                    {/* The name opens the seller's sales by item; the user page is the small link under it. */}
+                    {s.person ? (
+                      <PersonCell person={s.person} portalUrl={portalUrl} href={sellerHref} />
+                    ) : (
+                      <Link href={sellerHref} className="text-text hover:text-admin no-underline">{s.name}</Link>
+                    )}
+                    <span className="block text-[11px]">
+                      <Link href={sellerHref} className="text-admin hover:text-admin-hover">Sales by item</Link>
+                      {s.person && (
+                        <>
+                          <span className="text-text-subtle"> · </span>
+                          <Link href={`/users/${s.person.id}`} className="text-text-subtle hover:text-text no-underline">User page</Link>
+                        </>
+                      )}
+                    </span>
                   </td>
                   <td className={`${TD} text-xs text-text-muted`}>
                     {s.games.length === 0 ? <span className="text-text-subtle">platform-wide</span> : s.games.map((g, i) => (
@@ -68,7 +83,8 @@ export default function SellersPage({ searchParams }: { searchParams: SP }) {
                   <td className={`${TD} text-xs text-right tabular-nums text-text-muted`}>{num(s.split.promo)}</td>
                   <td className={`${TD} text-xs text-text-muted`}>{s.lastSale ? shortWhen(s.lastSale) : "never"}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </TableFrame>
         )}

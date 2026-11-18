@@ -9,7 +9,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { PageHeader } from "@/components/PageHeader";
-import { RoleControl, roleLabel } from "@/components/RoleControl";
+import { RoleControl } from "@/components/RoleControl";
+import { roleLabel } from "@/lib/roles";
 import { avatarSrc } from "@/lib/avatar";
 import { errorText, shortWhen } from "@/lib/format";
 

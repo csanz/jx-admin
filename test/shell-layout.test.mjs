@@ -141,3 +141,22 @@ test("only an admin gets the sidebar: the shell gates first, a non-admin gets th
   assert.match(req, /import \{ cache \} from "react"/);
   assert.match(req, /export const requireAdminPage = cache\(/);
 });
+
+test("server pages never call a helper exported from a 'use client' module (roleLabel lives in src/lib/roles.ts)", () => {
+  const roles = fs.readFileSync(path.join(ROOT, "src/lib/roles.ts"), "utf8");
+  assert.match(roles, /export const roleLabel/);
+  assert.doesNotMatch(roles, /"use client"/);
+  const control = fs.readFileSync(path.join(ROOT, "src/components/RoleControl.tsx"), "utf8");
+  assert.match(control, /^"use client";/);
+  assert.doesNotMatch(control, /export const roleLabel|export function roleLabel/);
+  // every server page that uses roleLabel imports it from the plain module
+  for (const p of pages(path.join(APP, GROUP))) {
+    const src = fs.readFileSync(path.join(APP, p), "utf8");
+    if (/roleLabel\(/.test(src)) assert.match(src, /import \{ roleLabel \} from "@\/lib\/roles"/, `${p} imports roleLabel from @/lib/roles`);
+    assert.doesNotMatch(src, /import \{[^}]*\broleLabel\b[^}]*\} from "@\/components\/RoleControl"/, `${p} must not import roleLabel from the client module`);
+  }
+  // the Sellers list: the seller's name opens the seller's sales, not the user page
+  const sellers = fs.readFileSync(path.join(APP, GROUP, "jbux/sellers/page.tsx"), "utf8");
+  assert.match(sellers, /<PersonCell person=\{s\.person\} portalUrl=\{portalUrl\} href=\{sellerHref\} \/>/);
+  assert.match(sellers, /href=\{`\/users\/\$\{s\.person\.id\}`\}[^>]*>User page</);
+});

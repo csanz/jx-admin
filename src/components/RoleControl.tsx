@@ -6,6 +6,7 @@
  * After a change it calls `onChanged` (the list reloads) or refreshes the server page.
  */
 import { useRouter } from "next/navigation";
+import { roleLabel } from "@/lib/roles";
 import { useState } from "react";
 import { errorText } from "@/lib/format";
 
@@ -16,7 +17,6 @@ export const ROLE_OPTIONS = [
   { value: "player", label: "user" },
 ] as const;
 
-export const roleLabel = (role: string) => (role === "player" ? "user" : role);
 
 export type RoleTarget = { id: string; email: string; username: string; name: string; role: string };
 

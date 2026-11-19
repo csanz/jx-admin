@@ -7,6 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const API = path.join(ROOT, "src/app/api");
@@ -86,6 +87,22 @@ test("no browser-facing module imports the portal client", () => {
       assert.doesNotMatch(src, /lib\/portal|lib\/env|lib\/auth|lib\/mongo|lib\/repo|JX_ADMIN_API_TOKEN|MONGODB_URI/, `${path.relative(ROOT, f)} is a client module and must not touch the portal client, the database, env or auth`);
     }
   }
+});
+
+/**
+ * 2026-11-19: a worktree's node_modules is a symlink to the main checkout's, and `node_modules/` in .gitignore
+ * ignores directories only, so b31f8b8 committed the link. Checking that commit out in the main checkout replaced
+ * the real node_modules with a link to itself. The rule is a bare `node_modules` line and no tracked symlink at all.
+ */
+test("the repo tracks no symlink and no node_modules, and the ignore rule covers a node_modules link", () => {
+  const entries = execFileSync("git", ["ls-files", "-s"], { cwd: ROOT, encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  assert.ok(entries.length > 50, "git ls-files answered");
+  const links = entries.filter((l) => l.startsWith("120000 "));
+  assert.deepEqual(links, [], `tracked symlinks: ${links.join(", ")}`);
+  const nm = entries.filter((l) => /\tnode_modules(\/|$)/.test(l));
+  assert.deepEqual(nm, [], `node_modules is tracked: ${nm.length} entries`);
+  const ignore = fs.readFileSync(path.join(ROOT, ".gitignore"), "utf8").split("\n");
+  assert.ok(ignore.includes("node_modules"), ".gitignore needs a bare node_modules line (a trailing slash would not ignore a symlink)");
 });
 
 const EM_DASH = String.fromCharCode(0x2014);

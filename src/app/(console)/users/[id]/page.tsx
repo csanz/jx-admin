@@ -14,6 +14,8 @@ import { duration, num, shortWhen, when } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage } from "@/lib/page-load";
 import { getUserDetail } from "@/lib/repo/user-detail";
+import { ACTIVITY_DEFAULT, ACTIVITY_RANGES, ACTIVITY_RANGE_LABEL, getUserActivity } from "@/lib/repo/user-activity";
+import { LineChartPanel } from "@/components/charts/LineChartPanel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "User" };
@@ -23,8 +25,9 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) 
 
 /**
  * One user: the header (avatar, name, role, waitlist state) with the set-role control, the wallet summary, the
- * sign-ins the portal records, the play history and the game sessions (each newest first, 50 a page), then every
- * field of the users row with secret-looking fields redacted.
+ * sign-ins the portal records, the activity line (plays per day over 1 week / 1 month / 1 year, ?activity=), the
+ * play history and the game sessions (each newest first, 50 a page), then every field of the users row with
+ * secret-looking fields redacted.
  */
 export default function UserPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SP }) {
   return gatedPage(async (actor) => {
@@ -32,8 +35,13 @@ export default function UserPage({ params, searchParams }: { params: Promise<{ i
     const sp = await searchParams;
     const plays = one(sp.plays);
     const sessions = one(sp.sessions);
+    const activity = one(sp.activity);
     const path = `/users/${id}`;
-    const r = await loadForPage("user", async () => getUserDetail(await mongoDb(), id, { playsPage: plays, sessionsPage: sessions }));
+    const r = await loadForPage("user", async () => {
+      const db = await mongoDb();
+      const detail = await getUserDetail(db, id, { playsPage: plays, sessionsPage: sessions });
+      return detail && { detail, activity: await getUserActivity(db, detail.user.id, { range: activity }) };
+    });
     if (!r.ok) {
       return (
         <>
@@ -52,12 +60,17 @@ export default function UserPage({ params, searchParams }: { params: Promise<{ i
         </>
       );
     }
-    const d = r.value;
+    const d = r.value.detail;
+    const act = r.value.activity;
     const u = d.user;
     const label = u.name || u.username || u.email || u.id;
     const privileged = u.role === "admin" || u.role === "developer" || u.role === "bot";
-    const href = (p: { plays?: number; sessions?: number }) =>
-      `${path}${qs({ plays: p.plays ?? (d.plays.page > 1 ? d.plays.page : null), sessions: p.sessions ?? (d.sessions.page > 1 ? d.sessions.page : null) })}`;
+    const href = (p: { plays?: number; sessions?: number; activity?: number }) =>
+      `${path}${qs({
+        activity: (p.activity ?? act.days) !== ACTIVITY_DEFAULT ? (p.activity ?? act.days) : null,
+        plays: p.plays ?? (d.plays.page > 1 ? d.plays.page : null),
+        sessions: p.sessions ?? (d.sessions.page > 1 ? d.sessions.page : null),
+      })}`;
     return (
       <>
         <PageHeader path={path} title={label} />
@@ -112,6 +125,28 @@ export default function UserPage({ params, searchParams }: { params: Promise<{ i
             below are the dated record of when this person played.
           </p>
         )}
+
+        <Section
+          title="Activity"
+          note={`${num(act.total)} ${act.total === 1 ? "play" : "plays"} on ${num(act.activeDays)} of the last ${act.days} days`}
+          right={
+            <nav aria-label="Activity range" className="flex items-center gap-1" data-testid="activity-range">
+              {ACTIVITY_RANGES.map((n) => (
+                <Link
+                  key={n}
+                  href={href({ activity: n })}
+                  scroll={false}
+                  aria-current={n === act.days ? "true" : undefined}
+                  className={`px-2.5 py-1 rounded-md border no-underline ${n === act.days ? "border-admin text-admin" : "border-border text-text-muted hover:text-text"}`}
+                >
+                  {ACTIVITY_RANGE_LABEL[n]}
+                </Link>
+              ))}
+            </nav>
+          }
+        >
+          <LineChartPanel title="Plays per day" total={act.peak ? `busiest day ${num(act.peak)}` : "no plays in the range"} points={act.points} series={[{ key: "plays", label: "plays" }]} note="a play is one sitting in a game, from the play history; UTC days" curve="linear" />
+        </Section>
 
         <Section title="Play history" note={`${num(d.plays.total)} in all, newest first`}>
           {d.plays.rows.length === 0 ? (

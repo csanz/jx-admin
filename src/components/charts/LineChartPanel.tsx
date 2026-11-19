@@ -3,7 +3,8 @@
 /**
  * ONE ANALYTICS LINE CHART (Recharts), styled with the product tokens only: transparent background, grid lines in
  * border-subtle, axis text in text-subtle at 11px, the first series in the admin accent, a second in text-muted, a
- * third in text-subtle (dashed), monotone curves, 1.5px lines, no dots except the active one on hover, and a small
+ * third in text-subtle (dashed), monotone curves (or straight segments with curve="linear", for sparse day counts
+ * where a smooth curve would invent values on the days between), 1.5px lines, no dots except the active one on hover, and a small
  * tooltip on the surface colour. The colours come from CSS classes (.jx-chart in globals.css) that read the theme
  * tokens, so the light theme follows without a re-render. It receives already-aggregated points from the server page.
  * test/analytics.test.mjs pins that it imports only react and recharts.
@@ -45,7 +46,7 @@ function Tip({ active, label, payload, series, decimals }: TipProps) {
   );
 }
 
-export function LineChartPanel({ title, total, points, series, decimals = 0, note }: { title: string; total: string; points: ChartPoint[]; series: ChartSeries[]; decimals?: number; note?: string }) {
+export function LineChartPanel({ title, total, points, series, decimals = 0, note, curve = "monotone" }: { title: string; total: string; points: ChartPoint[]; series: ChartSeries[]; decimals?: number; note?: string; curve?: "monotone" | "linear" }) {
   return (
     <section className="bg-surface border border-border rounded-xl p-3 min-w-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 mb-2">
@@ -73,7 +74,7 @@ export function LineChartPanel({ title, total, points, series, decimals = 0, not
             {series.map((s, i) => (
               <Line
                 key={s.key}
-                type="monotone"
+                type={curve}
                 dataKey={s.key}
                 name={s.label}
                 className={SERIES_CLASS[i]}

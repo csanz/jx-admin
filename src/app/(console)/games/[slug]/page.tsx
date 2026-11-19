@@ -2,10 +2,12 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { gatedPage } from "@/components/AdminGate";
 import { PlayerIdLink } from "@/components/DetailBits";
+import { GameMembersControl } from "@/components/GameMembersControl";
 import { LoadError } from "@/components/LoadError";
 import { BODY_ROW, HEAD_ROW, Pager, TableFrame, TD, TH, qs } from "@/components/ListBits";
 import { RoomsTable } from "@/components/RoomsTable";
 import { PageHeader } from "@/components/PageHeader";
+import { portalUrlIfSet } from "@/lib/env";
 import { num, shortWhen, when } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage } from "@/lib/page-load";
@@ -38,8 +40,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 const dash = (s: string) => s || "n/a";
 
-/** One game, read only: its fields and counters, its keys (count, label, created; never a key value), its join
- * requests and its rooms (25 a page, ?page=n, each room opens its own page). */
+/** One game: its fields and counters (read only), its PEOPLE (the owner, and the admins and contributors the console can
+ * set, owner 2026-11-18), its keys (count, label, created; never a key value), its join requests and its rooms (25 a
+ * page, ?page=n, each room opens its own page). */
 export default function GamePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   return gatedPage(async () => {
     const { slug: raw } = await params;
@@ -71,13 +74,13 @@ export default function GamePage({ params, searchParams }: { params: Promise<{ s
         </>
       );
     }
-    const { game: g, keys, joinRequests } = r.value;
+    const { game: g, keys, joinRequests, members } = r.value;
     const rooms = await loadForPage("game rooms", async () => listRooms(await mongoDb(), { game: g.slug, page: pageParam }));
     const c = g.counters;
     return (
       <>
         <PageHeader path={`/games/${raw}`} title={`${g.emoji ? `${g.emoji} ` : ""}${g.name || g.slug}`}>
-          <p className="text-xs text-text-subtle">Read only</p>
+          <p className="text-xs text-text-subtle">Read only, except People</p>
         </PageHeader>
 
         <div className="bg-surface border border-border rounded-xl p-4">
@@ -104,6 +107,10 @@ export default function GamePage({ params, searchParams }: { params: Promise<{ s
             <Field label="Id"><span className="font-mono text-xs">{g.id}</span></Field>
           </dl>
         </div>
+
+        <Section title="People" note={`${num(members.items.length)} besides the owner. An admin does everything the owner can on this game.`}>
+          <GameMembersControl slug={g.slug} gameName={g.name || g.slug} members={members} portalUrl={portalUrlIfSet()} />
+        </Section>
 
         <Section title="Counters">
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">

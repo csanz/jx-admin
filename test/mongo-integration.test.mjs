@@ -13,6 +13,7 @@ import { findUserRoleByEmail, searchUsers, setUserRole } from "../src/lib/repo/u
 import { applyWaitlistAction, listWaitlist, waitlistCounts } from "../src/lib/repo/waitlist.ts";
 import { getJbuxReport } from "../src/lib/repo/jbux-report.ts";
 import { getGameDetail, listGames } from "../src/lib/repo/games.ts";
+import { applyGameMemberChange } from "../src/lib/repo/game-members.ts";
 import { listCatalog } from "../src/lib/repo/catalog.ts";
 import { getRoomDetail, listRooms } from "../src/lib/repo/rooms.ts";
 import { listAuditActions } from "../src/lib/repo/audit.ts";
@@ -235,4 +236,40 @@ test("catalog and audit lists read their collections", { skip }, async () => {
   const a = await listAuditActions(db, { actor: "ZZ-INTEGRATION" });
   assert.equal(a.total, 1);
   assert.equal(a.rows[0].actor, "zz-integration@jazaix.com");
+});
+
+test("game members (owner 2026-11-18): add by username as admin, change to contributor, refuse the owner, remove; one audit row each", { skip }, async () => {
+  const gid = new ObjectId();
+  await db.collection("games").insertOne({ _id: gid, slug: "it-members", name: "Members Game", creator_id: ADMIN_ID, creator_name: "owner", contributors: [
+    { user_id: DEV_ID, credit: "Maps", listed: true, added_at: NOW },
+  ] });
+  await db.collection("users").updateOne({ _id: OLD_ID }, { $set: { username: "Simpl3Un1c0rn", usernameLower: "simpl3un1c0rn" } });
+  const actor = { id: ADMIN_ID.toString(), email: "it-admin@jazaix.com" };
+  const added = await applyGameMemberChange(db, { slug: "it-members", who: { username: "simpl3UN1C0RN" }, action: "set-role", role: "admin" }, actor, NOW);
+  assert.equal(added.ok, true);
+  assert.equal(added.changed, true);
+  assert.deepEqual([added.from, added.to], [null, "admin"]);
+  assert.deepEqual(added.members.items.map((i) => [i.userId, i.role]), [[DEV_ID.toString(), "contributor"], [OLD_ID.toString(), "admin"]]);
+  const stored = await db.collection("games").findOne({ _id: gid });
+  assert.deepEqual(stored.contributors[1], { user_id: OLD_ID, role: "admin", credit: "Contributor", listed: true, added_at: NOW }, "the entry the portal's members route would write");
+  const again = await applyGameMemberChange(db, { slug: "it-members", who: { userId: OLD_ID.toString() }, action: "set-role", role: "admin" }, actor, NOW);
+  assert.equal(again.changed, false, "same role: nothing written");
+  const demoted = await applyGameMemberChange(db, { slug: "it-members", who: { userId: DEV_ID.toString() }, action: "set-role", role: "admin" }, actor, NOW);
+  assert.equal(demoted.changed, true);
+  assert.deepEqual([demoted.from, demoted.to], ["contributor", "admin"]);
+  assert.equal((await db.collection("games").findOne({ _id: gid })).contributors[0].credit, "Maps", "a role change keeps the credit");
+  const owner = await applyGameMemberChange(db, { slug: "it-members", who: { userId: ADMIN_ID.toString() }, action: "set-role", role: "admin" }, actor, NOW);
+  assert.equal(owner.ok, false);
+  assert.equal(owner.status, 409);
+  assert.equal((await applyGameMemberChange(db, { slug: "no-such-game", who: { userId: DEV_ID.toString() }, action: "set-role", role: "admin" }, actor)).status, 404);
+  assert.equal((await applyGameMemberChange(db, { slug: "it-members", who: { username: "nobody-here" }, action: "set-role", role: "admin" }, actor)).status, 404);
+  const removed = await applyGameMemberChange(db, { slug: "it-members", who: { userId: OLD_ID.toString() }, action: "remove" }, actor, NOW);
+  assert.equal(removed.changed, true);
+  assert.deepEqual(removed.members.items.map((i) => i.userId), [DEV_ID.toString()]);
+  const audit = await db.collection(AUDIT_COLLECTION).find({ action: "game-member", actor: "it-admin@jazaix.com" }).sort({ _id: 1 }).toArray();
+  assert.equal(audit.length, 4, "add, same-role, change, remove each leave a row; refusals do not");
+  assert.deepEqual(audit.map((a) => [a.target, a.details.from, a.details.to]), [
+    [OLD_ID.toString(), null, "admin"], [OLD_ID.toString(), "admin", "admin"], [DEV_ID.toString(), "contributor", "admin"], [OLD_ID.toString(), "admin", null],
+  ]);
+  assert.ok(audit.every((a) => a.details.game === "it-members" && a.via === "admin-console"));
 });

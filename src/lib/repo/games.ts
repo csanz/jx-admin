@@ -10,6 +10,7 @@
 import { ObjectId, type Db, type Document, type Filter } from "mongodb";
 import { PAGE_SIZE, pageLimit, paged, parsePage, type Paged } from "./paging.ts";
 import { idString, isoOrNull, numberOr0, regexEscape, stringOr } from "./values.ts";
+import { gameMembersOf, type GameMembers } from "./game-members.ts";
 
 export const GAME_QUERY_MAX = 80;
 export const GAME_JOIN_REQUESTS_LIMIT = 50;
@@ -147,6 +148,8 @@ export type GameDetail = {
   game: GameView;
   keys: { count: number; items: GameKeyView[] };
   joinRequests: { count: number; items: JoinRequestView[] };
+  /** The owner and the people on the game (admins, contributors), with their accounts (repo/game-members.ts). */
+  members: GameMembers;
 };
 
 /** The game with this slug and what hangs off it, or null when there is none. */
@@ -183,6 +186,7 @@ export async function getGameDetail(db: Db, slug: unknown): Promise<GameDetail |
     game: gameView(doc),
     keys: { count: keyCount, items: keyDocs.map(gameKeyView) },
     joinRequests: { count: joinCount, items: joinRequests },
+    members: await gameMembersOf(db, doc),
   };
 }
 

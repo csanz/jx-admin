@@ -11,7 +11,7 @@ import { displayValue, idString, isoOrNull, regexEscape, stringOr } from "./valu
 export const AUDIT_COLLECTION = "admin_actions";
 export const AUDIT_VIA = "admin-console";
 
-export type AdminAction = "waitlist-approve" | "waitlist-move-back" | "set-role";
+export type AdminAction = "waitlist-approve" | "waitlist-move-back" | "set-role" | "game-member";
 
 export type AuditInput = {
   /** The signed-in admin's email. */
@@ -58,7 +58,7 @@ export function recordAdminAction(db: Db, input: AuditInput): Promise<AuditDoc> 
 export const AUDIT_PAGE_SIZE = 100;
 export const AUDIT_ACTOR_MAX = 120;
 /** The actions this console writes; the filter accepts these (other writers' actions show, unfiltered). */
-export const AUDIT_ACTIONS: readonly AdminAction[] = ["waitlist-approve", "waitlist-move-back", "set-role"];
+export const AUDIT_ACTIONS: readonly AdminAction[] = ["waitlist-approve", "waitlist-move-back", "set-role", "game-member"];
 
 export type AuditRow = { id: string; at: string | null; actor: string; action: string; target: string; via: string; details: string };
 export type AuditFilterInput = { actor?: unknown; action?: unknown; page?: unknown };

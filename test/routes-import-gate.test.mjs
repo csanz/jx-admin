@@ -24,7 +24,7 @@ function routeFiles(dir, out = []) {
 test("every src/app/api/**/route.ts imports the admin gate (except the two named exceptions)", () => {
   const files = routeFiles(API).map((f) => path.relative(API, f)).sort();
   assert.ok(files.length >= 8, `expected the known routes, found ${files.length}`);
-  const expected = ["auth/[...nextauth]/route.ts", "health/route.ts", "jbox/hold/route.ts", "jbox/refund/route.ts", "jbox/report/route.ts", "me/route.ts", "users/route.ts", "waitlist/route.ts"];
+  const expected = ["auth/[...nextauth]/route.ts", "games/[slug]/members/route.ts", "health/route.ts", "jbox/hold/route.ts", "jbox/refund/route.ts", "jbox/report/route.ts", "me/route.ts", "users/route.ts", "waitlist/route.ts"];
   assert.deepEqual(files, expected);
   for (const rel of files) {
     const src = fs.readFileSync(path.join(API, rel), "utf8");

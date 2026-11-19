@@ -148,7 +148,7 @@ the same height (`--spacing-header`, class `h-header`), vertically centred, no b
 | Overview analytics | MongoDB `game_sessions`, `matches`, `daily_stats`, `users`, `credit_transactions`, `jbox_receipts`, `client_reports`, `games` | nothing |
 | Waitlist | MongoDB `users` | MongoDB `users` (+ `admin_actions`), Resend for the email |
 | Users | MongoDB `users` | MongoDB `users.role` (+ `admin_actions`) |
-| Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails) | nothing |
+| Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails, names) | MongoDB `games.contributors[]` (a game's admins and contributors, + `admin_actions`) |
 | Rooms | MongoDB `rooms`, `game_sessions`, `matches`, `server_events`, `live_snapshots`, `client_reports` (all by `room_id`) | nothing |
 | User detail | MongoDB `users` (secrets redacted), `wallets`, `play_history` (+ `games` names), `game_sessions` (by `player_id`) | `users.role` through the same set-role control |
 | Audit | MongoDB `admin_actions` | nothing (the other sections append to it) |

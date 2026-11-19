@@ -159,11 +159,14 @@ test("the Users screen: a Last active column in words, sortable headers for name
   assert.match(ui, /aria-sort=\{active \? \(order\.dir === "asc" \? "ascending" : "descending"\) : undefined\}/);
   assert.match(ui, /data-testid="last-active"/);
   assert.match(ui, /\{ago\(u\.lastActive\?\.at\)\}/);
-  assert.match(ui, /orderQuery\(order\)/);
+  // the order travels in the URL and in every list request (the first page and "more")
+  assert.match(ui, /sort: order\.sort, dir: order\.dir/);
+  assert.match(ui, /fetch\(`\/api\/users\?\$\{listQuery\}`/);
+  assert.match(ui, /fetch\(`\/api\/users\?\$\{listQuery\}&skip=\$\{data\.users\.length\}`/);
   assert.match(ui, /colSpan=\{6\}/);
   assert.doesNotMatch(ui, /colSpan=\{5\}/);
   assert.doesNotMatch(ui, /\u2014/, "no em dashes");
   const route = read("src/app/api/users/route.ts");
   assert.match(route, /parseUserOrder\(sp\.get\("sort"\), sp\.get\("dir"\)\)/);
-  assert.match(route, /searchUsers\(await mongoDb\(\), q, skip, order\)/);
+  assert.match(route, /searchUsers\(await mongoDb\(\), q, skip, order, filter\)/);
 });

@@ -58,11 +58,11 @@ test("/waitlist redirects to /users/waitlist and no page is left at the old rout
   assert.equal(r.permanent, true);
 });
 
-test("the sidebar tree: Users (List, Waitlist), Games (Overview, List, Rooms), Assets (Registry), JBux (Purchases, Catalog, Sellers, Wallets, Ledger), Audit", () => {
+test("the sidebar tree: Users (Overview, List, Waitlist), Games (Overview, List, Rooms), Assets (Registry), JBux (Purchases, Catalog, Sellers, Wallets, Ledger), Audit", () => {
   assert.deepEqual(
     NAV.map((s) => [s.label, s.items.map((i) => `${i.label} ${i.href}`)]),
     [
-      ["Users", ["List /users", "Waitlist /users/waitlist"]],
+      ["Users", ["Overview /users/overview", "List /users", "Waitlist /users/waitlist"]],
       ["Games", ["Overview /games/overview", "List /games", "Rooms /games/rooms"]],
       ["Assets", ["Registry /assets"]],
       ["JBux", ["Purchases /jbux", "Catalog /jbux/catalog", "Sellers /jbux/sellers", "Wallets /jbux/wallets", "Ledger /jbux/ledger"]],
@@ -80,6 +80,22 @@ test("the sidebar tree: Users (List, Waitlist), Games (Overview, List, Rooms), A
   for (const item of allNavItems()) assert.ok(readme.includes(`\`${item.href}\``), `README Navigation must list ${item.href}`);
 });
 
+test("the rail is a stable tree (owner 2026-11-19): every section's items are always shown, nothing opens or closes with the page; a one-page section is one row", () => {
+  const frame = fs.readFileSync(path.join(ROOT, "src/components/SidebarFrame.tsx"), "utf8");
+  // the sub-list renders for every multi-page section, never behind an "is this section active" condition
+  assert.match(frame, /\{!single && !effectiveCollapsed && \(\s*<ul/);
+  assert.doesNotMatch(frame, /\{open && !effectiveCollapsed/);
+  // in the expanded rail only the page's own row is lit; the collapsed strip lights the section icon
+  assert.match(frame, /const lit = single \? active === first\.href : effectiveCollapsed && inSection;/);
+  assert.match(frame, /active === i\.href \? "bg-bg text-text"/);
+  // the main overview shares the overviews' range switch
+  const overview = fs.readFileSync(path.join(ROOT, "src/app/(console)/page.tsx"), "utf8");
+  assert.match(overview, /<RangeSwitch days=\{days\} hrefFor=/);
+  assert.doesNotMatch(overview, /\{d\} days/);
+  // the search box no longer grabs focus on load (the other lists' boxes never did)
+  assert.doesNotMatch(fs.readFileSync(path.join(ROOT, "src/app/(console)/users/UsersConsole.tsx"), "utf8"), /autoFocus/);
+});
+
 test("activeHref and navTrail: the longest matching item wins, detail pages light their list", () => {
   assert.equal(activeHref("/"), "/");
   assert.equal(activeHref("/users"), "/users");
@@ -93,6 +109,8 @@ test("activeHref and navTrail: the longest matching item wins, detail pages ligh
   assert.equal(activeHref("/jbux/sellers/jazaix"), "/jbux/sellers");
   assert.equal(activeHref("/jbux"), "/jbux");
   assert.equal(activeHref("/users/6ae204d8c05a94f95f234732"), "/users");
+  assert.equal(activeHref("/users/overview?activity=365"), "/users/overview");
+  assert.deepEqual(navTrail("/users/overview"), { section: "Users", item: "Overview" });
   assert.equal(activeHref("/sign-in"), null);
   assert.deepEqual(navTrail("/games/last-minute"), { section: "Games", item: "List" });
   assert.deepEqual(navTrail("/users/waitlist"), { section: "Users", item: "Waitlist" });

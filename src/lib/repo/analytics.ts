@@ -1,5 +1,6 @@
 /**
- * ANALYTICS for the overview: daily usage series and a per-game table for a range of 7, 30 or 90 UTC days.
+ * ANALYTICS for the overview: daily usage series and a per-game table for a range of 7, 30 or 365 UTC days (the same
+ * 1 week / 1 month / 1 year switch as the Games and Users overviews, owner 2026-11-19: the pages must line up).
  *
  * The database buckets by UTC day (`$dateToString` on `$toDate` of the stored field, so a Date or an ISO string both
  * work); the code fills the missing days with zeros (`zeroFill`) and merges the per-game rows. Every series is a list of
@@ -17,11 +18,11 @@
 import type { Db, Document } from "mongodb";
 import { idString, numberOr0, stringOr } from "./values.ts";
 
-export const RANGE_DAYS = [7, 30, 90] as const;
+export const RANGE_DAYS = [7, 30, 365] as const;
 export type RangeDays = (typeof RANGE_DAYS)[number];
 const DAY = 86_400_000;
 
-/** ?range= -> 7, 30 or 90 (default 30). */
+/** ?range= -> 7, 30 or 365 (default 30). */
 export function parseRangeDays(v: unknown): RangeDays {
   const n = typeof v === "string" ? Number(v) : v;
   return (RANGE_DAYS as readonly number[]).includes(n as number) ? (n as RangeDays) : 30;

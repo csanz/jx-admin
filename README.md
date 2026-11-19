@@ -16,7 +16,9 @@ have one implementation.
 - **Data layer** (`src/lib/mongo.ts` + `src/lib/repo/*.ts`): the official `mongodb` driver (6.x, the portal's
   major), one cached client (serverless-safe, 5 s server selection timeout, never opened at import time), env
   `MONGODB_URI` and `MONGODB_DB` (default `jx_portal`). The repo modules take a `Db` and have no framework imports:
-  - `repo/users.ts`: the role lookup behind the gate, search by email / username / name, set role.
+  - `repo/users.ts`: the role lookup behind the gate, search by email / username / name, the list's order and
+    filters (the shared, browser-safe parts are `src/lib/user-order.ts` and `src/lib/user-filter.ts`), set role.
+  - `repo/users-overview.ts`: the Users overview (accounts in numbers, new accounts and players per day, last seen).
   - `repo/waitlist.ts`: the portal's waitlist model, field for field (access, approvedAt, approvedBy, waitlistedAt,
     waitlistEmails), so the portal keeps working against the same rows.
   - `repo/jbux-report.ts`: the portal's JBux admin report (read side), test money apart from real money.
@@ -42,7 +44,7 @@ have one implementation.
   (splits, pots, entitlement revocation) stay in the portal on purpose: one implementation of the money rules; this
   console never writes `wallets` or `credit_transactions`. The link is optional (both or neither): without it the
   two forms show "money actions need the portal link" and are disabled; everything else works on MongoDB alone.
-- **Own API** (`src/app/api/`, for the client components): `/api/waitlist` (GET, POST), `/api/users` (GET `?q=&skip=`, POST), `/api/jbox/report` (GET),
+- **Own API** (`src/app/api/`, for the client components): `/api/waitlist` (GET, POST), `/api/users` (GET `?q=&skip=&sort=&dir=&active=&kind=&af=&at=&created=&cf=&ct=&role=&access=`, POST), `/api/jbox/report` (GET),
   `/api/jbox/refund` (POST, portal), `/api/jbox/hold` (POST, portal), `/api/me` (GET), `/api/health` (GET, no auth:
   `{ ok, mongo, portal }`). Every handler except `/api/auth/*` and `/api/health` goes through the admin gate; every
   POST also passes the same-origin JSON check (CSRF). An unreachable database is a 504 `db-unavailable`.
@@ -61,16 +63,18 @@ aside, 240 px (72 px collapsed with the panel toggle in the logo row or Ctrl/Cmd
 hamburger bar under 768 px), the logo row (pt-6 pb-4, the mark at 32 px), the account chip (the admin's own user
 page), 40 px rows with 20 px stroke icons (`src/components/rail-row.tsx`, the portal's `railRow` and `Icon`), the
 portal's active (`bg-bg text-text`) and hover colours, the dividers, and the theme row in the footer. The admin's
-additions inside that geometry: the active section's items open under it, indented to the label, and a Sign out row
-sits under the theme row. The content sits beside the rail under a page header (section crumb + title). The tree is
+additions inside that geometry: every section's items sit under it at all times, indented to the label (a stable
+tree: nothing opens or closes as you move between pages, only the page's own row is lit; a one-page section is one
+row), and a Sign out row sits under the theme row. The content sits beside the rail under a page header (section crumb + title). The tree is
 declared once, in `src/lib/nav.ts` (labels, hrefs and icon paths); every page lives in the `src/app/(console)` route
 group, whose layout renders the shell. `test/rail-parity.test.mjs` compares the geometry and colour strings with the
 portal's source when jx-portal is checked out next to this repo.
 
 | Sidebar | Route | What it shows |
 | --- | --- | --- |
-| Overview | `/` | analytics home: the four counts in one row, a 7 / 30 / 90 day switch (`?range=`), eight line charts (players, sessions seated vs watching, play hours, rounds, peak concurrent, new accounts, JBux spent by pot + purchases, client errors vs reports), the per-game table for the range, the 5 newest admin actions |
-| Users > List | `/users` | search by email / username / name, role, waitlist state, created, last active ("2 days ago": the later of the last sign-in and the last play), set role; sortable by name, created or last active; 50 a page, "more"; each row opens the user |
+| Overview | `/` | analytics home: the four counts in one row, the 1 week / 1 month / 1 year switch (`?range=7|30|365`, the same switch as the Games and Users overviews), eight line charts (players, sessions seated vs watching, play hours, rounds, peak concurrent, new accounts, JBux spent by pot + purchases, client errors vs reports), the per-game table for the range, the 5 newest admin actions |
+| Users > Overview | `/users/overview` | player traffic across the board for 1 week / 1 month / 1 year (`?activity=7|30|365`): accounts, new, active, returning, waitlist and never-active tiles; new accounts per day; players per day across every game split into accounts and guests (the games overview's source and rule); every account by when it was last seen (today / this week / this month / older / never), each a link into the filtered list. Bots left out |
+| Users > List | `/users` | search by email / username / name, role, waitlist state, created, last active ("2 days ago": the later of the last sign-in and the last play), set role; sortable by name, created or last active; filters in the URL: an activity window (last 24 hours / 5 / 7 / 30 days or a range of UTC days) counting plays, sign-ins or either, a created window, role, waitlist state; "who played this week" = `/users?active=7d&kind=played`; 50 a page, "more"; each row opens the user |
 | (User detail) | `/users/[id]` | every field of the users row (token / secret / hash fields redacted), role (settable), waitlist state, wallet summary, sign-ins (first + latest: all the portal stores), the activity line (plays per day, 1 week / 1 month / 1 year), play history and game sessions (50 a page each) |
 | Users > Waitlist | `/users/waitlist` | waiting and approved, approve, move back (`/waitlist` redirects here) |
 | Games > Overview | `/games/overview` | activity for 1 week / 1 month / 1 year (`?activity=7|30|365`): players and sessions per day across every game, the most active games ranked, and a players-per-day line for each of the top 10 |

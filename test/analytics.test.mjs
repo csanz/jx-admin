@@ -7,14 +7,14 @@ import { dayKeys, dayOf, dayStages, isEmptySeries, matchGameKey, mergeGameRows, 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
 const NOW = new Date("2026-11-17T23:59:00Z");
 
-test("range: 7 / 30 / 90 days (30 by default), UTC days including today, oldest first", () => {
+test("range: 7 / 30 / 365 days (30 by default; the overviews' 1 week / 1 month / 1 year), UTC days including today, oldest first", () => {
   assert.equal(parseRangeDays("7"), 7);
-  assert.equal(parseRangeDays("90"), 90);
-  for (const bad of ["", "31", "x", null, 8]) assert.equal(parseRangeDays(bad), 30);
+  assert.equal(parseRangeDays("365"), 365);
+  for (const bad of ["", "31", "90", "x", null, 8]) assert.equal(parseRangeDays(bad), 30);
   assert.equal(rangeStart(NOW, 7).toISOString(), "2026-11-11T00:00:00.000Z");
   const k = dayKeys(NOW, 7);
   assert.deepEqual(k, ["2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17"]);
-  assert.equal(dayKeys(NOW, 90).length, 90);
+  assert.equal(dayKeys(NOW, 365).length, 365);
   assert.equal(dayKeys(new Date("2026-03-30T01:00:00Z"), 3)[0], "2026-03-28", "no DST drift in UTC");
 });
 

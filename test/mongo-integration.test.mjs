@@ -9,7 +9,8 @@ import { ObjectId } from "mongodb";
 import { mongoClientFor } from "../src/lib/mongo.ts";
 import { parseAllowlist, decideAdmin } from "../src/lib/admin-gate.ts";
 import { AUDIT_COLLECTION } from "../src/lib/repo/audit.ts";
-import { findUserRoleByEmail, searchUsers, setUserRole } from "../src/lib/repo/users.ts";
+import { EMPTY_USER_FILTER, findUserRoleByEmail, searchUsers, setUserRole } from "../src/lib/repo/users.ts";
+import { getUsersOverview } from "../src/lib/repo/users-overview.ts";
 import { applyWaitlistAction, listWaitlist, waitlistCounts } from "../src/lib/repo/waitlist.ts";
 import { getJbuxReport } from "../src/lib/repo/jbux-report.ts";
 import { getGameDetail, listGames } from "../src/lib/repo/games.ts";
@@ -196,6 +197,80 @@ test("users: search by email or username; set role writes users.role and audits;
   const bot = await setUserRole(db, { userId: BOT_ID.toString(), role: "admin", actor });
   assert.equal(bot.error, "bot-account");
   assert.equal((await setUserRole(db, { userId: new ObjectId().toString(), role: "admin", actor })).status, 404);
+});
+
+test("users: filters (owner 2026-11-19): who played this week, signed in, either, the last 24 hours, a range of days, created, role, waitlist, combined with the search", { skip }, async () => {
+  const f = (o) => ({ ...EMPTY_USER_FILTER, ...o });
+  const who = async (q, filter) => {
+    const r = await searchUsers(db, q, 0, undefined, filter, NOW);
+    assert.equal(r.total, r.users.length, "the count matches the page");
+    assert.deepEqual(r.filter, filter, "the filter is echoed back");
+    return r.users.map((u) => u.username || u.email).sort();
+  };
+  // NOW is 2026-11-17 12:00 UTC: the last 7 days start 11-10 12:00, the last 24 hours 11-16 12:00
+  assert.deepEqual(await who("", f({ active: { preset: "7d" }, kind: "played" })), ["alice", "old"]);
+  assert.deepEqual(await who("", f({ active: { preset: "7d" }, kind: "signed-in" })), ["dev", "old"]);
+  assert.deepEqual(await who("", f({ active: { preset: "7d" } })), ["alice", "dev", "old"]);
+  assert.deepEqual(await who("", f({ active: { preset: "1d" } })), ["old"], "dev signed in at 09:00, before the 24-hour window");
+  assert.deepEqual(await who("", f({ active: { preset: "range", from: "2026-11-14", to: "2026-11-14" }, kind: "played" })), ["alice"]);
+  assert.deepEqual(await who("", f({ active: { preset: "range", from: "2026-11-01", to: "2026-11-09" } })), [], "nobody: an empty list, not everyone");
+  assert.deepEqual(await who("", f({ created: { preset: "range", from: "2026-11-10", to: "2026-11-12" } })), ["alice", "bob"]);
+  assert.deepEqual(await who("", f({ created: { preset: "30d" } })), ["alice", "bob", "bot-1@crew.jazaix.com"]);
+  assert.deepEqual(await who("", f({ created: { preset: "30d" }, role: "player" })), ["alice", "bob"]);
+  assert.deepEqual(await who("", f({ role: "admin" })), ["owner"]);
+  assert.deepEqual(await who("", f({ role: "bot" })), ["bot-1@crew.jazaix.com"]);
+  assert.deepEqual(await who("", f({ role: "player" })), ["alice", "bob"], "old became a developer in the set-role test above");
+  assert.deepEqual(await who("", f({ role: "developer" })), ["dev", "old"]);
+  // the waitlist tests above approved alice and moved bob back
+  assert.deepEqual(await who("", f({ access: "waitlist" })), ["bob", "bot-1@crew.jazaix.com"]);
+  assert.deepEqual(await who("", f({ access: "approved" })), ["alice", "dev", "old", "owner"]);
+  assert.deepEqual(await who("example", f({ active: { preset: "7d" }, kind: "played" })), ["alice", "old"]);
+  assert.deepEqual(await who("old", f({ active: { preset: "7d" }, kind: "played", access: "waitlist" })), []);
+  // the filtered list keeps its order and its last-active column
+  const r = await searchUsers(db, "", 0, { sort: "active", dir: "desc" }, f({ active: { preset: "7d" } }), NOW);
+  assert.deepEqual(r.users.map((u) => u.username), ["old", "dev", "alice"]);
+  assert.deepEqual(r.users[0].lastActive, { at: "2026-11-17T10:00:00.000Z", kind: "played" });
+});
+
+test("users overview (owner 2026-11-19): tiles, new accounts per day, players per day split into accounts and guests, last seen; bots left out", { skip }, async () => {
+  await db.collection("game_sessions").insertMany([
+    { _id: "r1:1", player_id: OLD_ID.toString(), role: "player", joined_at: new Date("2026-11-16T10:00:00Z"), seated: true, game_slug: "g1" },
+    { _id: "r1:2", player_id: "anon_abc", role: "player", joined_at: new Date("2026-11-16T11:00:00Z"), seated: true, game_slug: "g1" },
+    { _id: "r1:3", player_id: BOT_ID.toString(), role: "bot", joined_at: new Date("2026-11-16T12:00:00Z"), seated: true, game_slug: "g1" },
+    { _id: "r2:1", player_id: OLD_ID.toString(), role: "player", joined_at: new Date("2026-11-17T01:00:00Z"), seated: true, game_slug: "g1" },
+    { _id: "r0:1", player_id: "anon_abc", role: "player", joined_at: new Date("2026-11-15T20:00:00Z"), seated: false, game_slug: "g2" },
+  ]);
+  const o = await getUsersOverview(db, { range: "30", now: NOW });
+  assert.equal(o.days, 30);
+  assert.equal(o.from, "2026-10-19");
+  assert.equal(o.to, "2026-11-17");
+  assert.equal(o.accounts, 5, "the bot is not an account");
+  assert.equal(o.newAccounts.total, 2, "alice and bob; the bot's creation does not count");
+  assert.equal(o.active, 3, "old, dev, alice");
+  assert.equal(o.returning, 2, "old and dev were created before the range");
+  // the waitlist tests above approved and moved people; the tile is whatever the rows say now, bots never counted
+  const waiting = await db.collection("users").countDocuments({ role: { $ne: "bot" }, access: "waitlist" });
+  assert.ok(waiting >= 1);
+  assert.equal(o.waitlist, waiting);
+  assert.equal(o.neverActive, 2, "owner and bob");
+  assert.deepEqual(o.lastSeen.map((r) => [r.bucket, r.count]), [["today", 1], ["week", 2], ["month", 0], ["older", 0], ["never", 2]]);
+  assert.equal(o.lastSeen[0].share, 1 / 5);
+  const by = Object.fromEntries(o.newAccounts.points.map((p) => [p.day, p.accounts]));
+  assert.equal(o.newAccounts.points.length, 30);
+  assert.equal(by["2026-11-10"], 1);
+  assert.equal(by["2026-11-12"], 1);
+  assert.equal(by["2026-11-01"], 0, "the bot's day");
+  const players = Object.fromEntries(o.players.points.map((p) => [p.day, [p.accounts, p.guests]]));
+  assert.deepEqual(players["2026-11-15"], [0, 1]);
+  assert.deepEqual(players["2026-11-16"], [1, 1], "the bot session is left out");
+  assert.deepEqual(players["2026-11-17"], [1, 0]);
+  assert.deepEqual({ total: o.players.total, accounts: o.players.accounts, guests: o.players.guests }, { total: 2, accounts: 1, guests: 1 });
+  // a week: only the sessions and sign-ups of the last 7 days
+  const w = await getUsersOverview(db, { range: "7", now: NOW });
+  assert.equal(w.newAccounts.total, 1, "bob on 11-12; alice's 11-10 is the day before the week");
+  assert.equal(w.active, 3);
+  assert.equal(w.returning, 3, "alice (created 11-10) is returning for a week that starts 11-11");
+  assert.equal(w.players.total, 2);
 });
 
 test("JBux report: real, test and promo money stay apart; splits, debits, legacy wallets and test buys as the portal counts them", { skip }, async () => {

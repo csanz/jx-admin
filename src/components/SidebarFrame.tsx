@@ -6,8 +6,11 @@
  * the only difference is that the logo is a different colour". So: the same aside (surface, 240 px, 72 px collapsed,
  * 260 px drawer under md), the same logo row (pt-6 pb-4, the mark at h-8, the panel toggle, Ctrl/Cmd+B), the same
  * account chip, the same rows (rail-row.tsx), the same dividers, the same footer (theme row), the same mobile top
- * bar. The admin's additions sit inside that geometry: a section's sub-items open under it (indented to the label)
- * while that section is active, and a Sign out row sits under the theme row. The mark is in the admin colour.
+ * bar. The admin's additions sit inside that geometry: every section's sub-items sit under it at all times (indented
+ * to the label), so the tree never moves as the admin goes from page to page (owner 2026-11-19: "when you navigate
+ * from overview to games to users, the alignment is completely off ... it needs to look solid"); only the page's own
+ * row is lit. A section with one page is one row. A Sign out row sits under the theme row. The mark is in the admin
+ * colour.
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -136,28 +139,31 @@ export function SidebarFrame({
             {!effectiveCollapsed && <span className="text-sm">{OVERVIEW.label}</span>}
           </Link>
           {NAV.map((s) => {
-            const open = openSection === s.label;
+            const inSection = openSection === s.label;
             const first = s.items[0];
+            const single = s.items.length === 1;
+            // collapsed strip: the section's icon is lit for the page inside it; expanded: only the page's row is lit
+            const lit = single ? active === first.href : effectiveCollapsed && inSection;
             return (
-              <div key={s.label} className="space-y-1">
+              <div key={s.label} className="space-y-0.5" data-testid={`rail-section-${s.label.toLowerCase()}`}>
                 <Link
                   href={first.href}
                   onClick={closeMobile}
-                  className={railLink(effectiveCollapsed, open)}
+                  className={railLink(effectiveCollapsed, lit)}
                   title={effectiveCollapsed ? s.label : undefined}
-                  aria-current={open && effectiveCollapsed ? "page" : undefined}
+                  aria-current={lit ? "page" : undefined}
                 >
                   <span className="shrink-0"><RailIcon d={s.icon} /></span>
                   {!effectiveCollapsed && <span className="text-sm">{s.label}</span>}
                 </Link>
-                {open && !effectiveCollapsed && (
-                  <ul className="space-y-1">
+                {!single && !effectiveCollapsed && (
+                  <ul className="space-y-0.5 pb-1">
                     {s.items.map((i) => (
                       <li key={i.href}>
                         <Link
                           href={i.href}
                           onClick={closeMobile}
-                          className={`flex items-center h-8 pl-[46px] pr-3 rounded-lg text-sm no-underline transition-colors ${
+                          className={`flex items-center h-7 pl-[46px] pr-3 rounded-lg text-[13px] no-underline transition-colors ${
                             active === i.href ? "bg-bg text-text" : "text-text-muted hover:text-text hover:bg-bg/60"
                           }`}
                           aria-current={active === i.href ? "page" : undefined}

@@ -191,10 +191,73 @@ export function userListPipeline(filter: Record<string, unknown>, order: UserOrd
     : [{ $match: filter }, ...page, ...LAST_ACTIVE_STAGES, project];
 }
 
-/** A page of USER_SEARCH_LIMIT users matching q in `order` (newest first by default), starting at `skip` (the list's "more" control). */
-export async function searchUsers(db: Db, q: unknown, skip: unknown = 0, order: UserOrder = DEFAULT_USER_ORDER): Promise<{ users: UserView[]; total: number; skip: number; order: UserOrder }> {
+// ── FILTERS (owner 2026-11-19: "who played this week ... date ranges ... the last 5 days, the last 30 days") ──────
+
+// The filters themselves (the windows, the kinds, the URL parsing) live in src/lib/user-filter.ts, which the browser shares.
+import { EMPTY_USER_FILTER, windowBounds, type UserFilter, type Window } from "../user-filter.ts";
+export { EMPTY_USER_FILTER, isEmptyUserFilter, parseUserFilter, userFilterParams, userFilterSummary, type UserFilter } from "../user-filter.ts";
+
+/** Pure: { $gte, $lt? } for a window at `now`. */
+export function windowRange(w: Window, now: Date): Record<string, Date> {
+  const b = windowBounds(w, now);
+  return b.to ? { $gte: b.from, $lt: b.to } : { $gte: b.from };
+}
+
+/** Pure: a play_history.user_id (the hex string in some rows, the ObjectId in others) as lower-case hex, or null. */
+export function userIdHex(v: unknown): string | null {
+  if (v instanceof ObjectId) return v.toHexString();
+  return typeof v === "string" && OBJECT_ID_RE.test(v) ? v.toLowerCase() : null;
+}
+
+/**
+ * The distinct users with a play_history row in the range ({ $gte, $lt? } on played_at), as ObjectIds; both id forms
+ * come back as one id each. The query is a scan of the range's rows (play_history has no played_at index); the
+ * collection holds one row per game per five minutes of play.
+ */
+export async function playedUserIds(db: Db, range: Record<string, Date>): Promise<ObjectId[]> {
+  const rows = await db.collection("play_history").aggregate<{ _id: unknown }>([{ $match: { played_at: range } }, { $group: { _id: "$user_id" } }]).toArray();
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const hex = userIdHex(r._id);
+    if (hex) seen.add(hex);
+  }
+  return [...seen].map((hex) => new ObjectId(hex));
+}
+
+/**
+ * Pure: the Mongo filter for a UserFilter, given the ids that played in the active window (null when the filter does
+ * not need them). "player" is the portal's word for an ordinary user and is stored as "player" or not at all.
+ */
+export function userFilterConditions(f: UserFilter, now: Date, played: ObjectId[] | null): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+  if (f.active) {
+    const signedIn = { lastLoginAt: windowRange(f.active, now) };
+    const playedIn = { _id: { $in: played ?? [] } };
+    out.push(f.kind === "played" ? playedIn : f.kind === "signed-in" ? signedIn : { $or: [signedIn, playedIn] });
+  }
+  if (f.created) out.push({ createdAt: windowRange(f.created, now) });
+  if (f.role) out.push(f.role === "player" ? { $or: [{ role: "player" }, { role: { $exists: false } }, { role: null }] } : { role: f.role });
+  if (f.access) out.push(f.access === "waitlist" ? { access: "waitlist" } : { access: { $ne: "waitlist" } });
+  return out;
+}
+
+/** The whole list filter: the search text and every set filter, $and-ed; {} when nothing is set. */
+export async function buildUserFilter(db: Db, q: unknown, f: UserFilter, now: Date): Promise<Record<string, unknown>> {
+  const needPlayed = f.active !== null && f.kind !== "signed-in";
+  const played = needPlayed ? await playedUserIds(db, windowRange(f.active as Window, now)) : null;
+  const parts = [userSearchFilter(q), ...userFilterConditions(f, now, played)].filter((p) => Object.keys(p).length);
+  return parts.length === 0 ? {} : parts.length === 1 ? parts[0] : { $and: parts };
+}
+
+export type UserSearch = { users: UserView[]; total: number; skip: number; order: UserOrder; filter: UserFilter };
+
+/**
+ * A page of USER_SEARCH_LIMIT users matching q and the filter in `order` (newest first by default), starting at
+ * `skip` (the list's "more" control).
+ */
+export async function searchUsers(db: Db, q: unknown, skip: unknown = 0, order: UserOrder = DEFAULT_USER_ORDER, f: UserFilter = EMPTY_USER_FILTER, now: Date = new Date()): Promise<UserSearch> {
   const users = db.collection<UserDoc>("users");
-  const filter = userSearchFilter(q);
+  const filter = await buildUserFilter(db, q, f, now);
   const from = parseSkip(skip);
   // names sort case-insensitively (the collation); dates and ids are unaffected by it
   const options = order.sort === "name" ? { collation: { locale: "en", strength: 2 } } : {};
@@ -202,7 +265,7 @@ export async function searchUsers(db: Db, q: unknown, skip: unknown = 0, order: 
     users.countDocuments(filter),
     users.aggregate<UserDoc>(userListPipeline(filter, order, from, USER_SEARCH_LIMIT), options).toArray(),
   ]);
-  return { users: list.map(userView), total, skip: from, order };
+  return { users: list.map(userView), total, skip: from, order, filter: f };
 }
 
 // ── SET ROLE ───────────────────────────────────────────────────────────────────────────────────────────────────

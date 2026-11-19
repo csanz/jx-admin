@@ -9,7 +9,8 @@ import { readEnv } from "@/lib/env";
 import { num } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage, type Loaded } from "@/lib/page-load";
-import { RANGE_DAYS, getAnalytics } from "@/lib/repo/analytics";
+import { RangeSwitch } from "@/components/RangeSwitch";
+import { getAnalytics } from "@/lib/repo/analytics";
 import { recentAuditActions } from "@/lib/repo/audit";
 import { getJbuxReport } from "@/lib/repo/jbux-report";
 import { waitlistCounts } from "@/lib/repo/waitlist";
@@ -36,7 +37,8 @@ function Tile({ label, href, value }: { label: string; href: string; value: Load
 }
 
 /**
- * THE OVERVIEW, an analytics home: the four counts as one compact row, the range switch (7 / 30 / 90 days), eight line
+ * THE OVERVIEW, an analytics home: the four counts as one compact row, the range switch (1 week / 1 month / 1 year,
+ * the same RangeSwitch as the Games and Users overviews so the three pages line up), eight line
  * charts of usage aggregated on the server (src/lib/repo/analytics.ts), the per-game table for the range, then the
  * newest admin actions.
  */
@@ -57,21 +59,14 @@ export default function OverviewPage({ searchParams }: { searchParams: SP }) {
     return (
       <>
         <PageHeader path="/" title="Overview">
-          <nav aria-label="Range" className="flex items-center gap-1 text-xs">
-            {RANGE_DAYS.map((d) => (
-              <Link
-                key={d}
-                href={d === 30 ? "/" : `/?range=${d}`}
-                scroll={false}
-                aria-current={d === days ? "true" : undefined}
-                className={`px-2.5 py-1 rounded-md border no-underline ${d === days ? "border-admin text-admin" : "border-border text-text-muted hover:text-text"}`}
-              >
-                {d} days
-              </Link>
-            ))}
-          </nav>
+          <RangeSwitch days={days} hrefFor={(n) => (n === 30 ? "/" : `/?range=${n}`)} />
         </PageHeader>
 
+        {analytics.ok && (
+          <p className="mb-2 text-xs text-text-subtle">
+            {analytics.value.from} to {analytics.value.to} (UTC days). Bot sessions and bot accounts are left out.
+          </p>
+        )}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
           <Tile label="waiting on the waitlist" href="/users/waitlist" value={pick(counts, (c) => c.waiting)} />
           <Tile label="approved" href="/users/waitlist" value={pick(counts, (c) => c.approved)} />
@@ -88,10 +83,7 @@ export default function OverviewPage({ searchParams }: { searchParams: SP }) {
             const fb = "from daily_stats";
             return (
               <>
-                <p className="mt-6 mb-2 text-xs text-text-subtle">
-                  {a.from} to {a.to} (UTC days). Bot sessions and bot accounts are left out.
-                </p>
-                <div className="grid gap-3 min-[900px]:grid-cols-2">
+                <div className="mt-4 grid gap-3 min-[900px]:grid-cols-2">
                   <LineChartPanel title="Players per day" total={`${num(a.players.total)} in the range`} points={a.players.points} series={[{ key: "players", label: "players" }]} note={a.players.fallback ? fb : "distinct player ids"} />
                   <LineChartPanel title="Sessions per day" total={num(a.sessions.total)} points={a.sessions.points} series={[{ key: "seated", label: "seated" }, { key: "watching", label: "watching" }]} note={a.sessions.fallback ? fb : undefined} />
                   <LineChartPanel title="Play time per day" total={hours(a.playHours.total)} points={a.playHours.points} series={[{ key: "playH", label: "hours" }]} decimals={1} note={a.playHours.fallback ? fb : undefined} />

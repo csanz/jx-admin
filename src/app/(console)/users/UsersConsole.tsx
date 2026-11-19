@@ -1,9 +1,11 @@
 "use client";
 
 /**
- * USERS: search by email or username (GET /api/users?q=), each row with role, waitlist state and created date, and
- * one action: set the role (POST /api/users { userId, role }) after a confirmation. The signed-in admin's own row
- * cannot be demoted (the server refuses it too). Same look as the waitlist screen.
+ * USERS: search by email or username (GET /api/users?q=&sort=&dir=), each row with role, waitlist state, created date
+ * and last active ("2 days ago": the later of the last sign-in and the last play, owner 2026-11-19), sortable by
+ * name, created or last active from the column headers, and one action: set the role (POST /api/users { userId,
+ * role }) after a confirmation. The signed-in admin's own row cannot be demoted (the server refuses it too). Same
+ * look as the waitlist screen.
  */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
@@ -12,14 +14,37 @@ import { PageHeader } from "@/components/PageHeader";
 import { RoleControl } from "@/components/RoleControl";
 import { roleLabel } from "@/lib/roles";
 import { avatarSrc } from "@/lib/avatar";
-import { errorText, shortWhen } from "@/lib/format";
+import { ago, errorText, shortWhen } from "@/lib/format";
+import { DEFAULT_USER_ORDER, defaultDir, type UserOrder, type UserSort } from "@/lib/user-order";
 
 type Row = {
   id: string; email: string; name: string; username: string; image: string; imageSmall: string; role: string; access: "approved" | "waitlist";
-  createdAt: string | null; lastLoginAt: string | null;
+  createdAt: string | null; lastLoginAt: string | null; lastActive: { at: string; kind: "played" | "signed-in" } | null;
 };
 type Data = { users: Row[]; total: number };
 const PAGE = 50;
+const TH = "px-3 py-2.5 font-normal";
+
+/** A column header that sorts the list: click to pick the column, click again to turn it around. */
+function SortHeader({ col, label, order, onSort, className = "" }: { col: UserSort; label: string; order: UserOrder; onSort: (col: UserSort) => void; className?: string }) {
+  const active = order.sort === col;
+  return (
+    <th className={`${TH} ${className}`} aria-sort={active ? (order.dir === "asc" ? "ascending" : "descending") : undefined}>
+      <button
+        type="button"
+        onClick={() => onSort(col)}
+        data-testid={`sort-${col}`}
+        title={active ? `Sorted by ${label.toLowerCase()}, ${order.dir === "asc" ? "ascending" : "descending"}; click to reverse` : `Sort by ${label.toLowerCase()}`}
+        className={`inline-flex items-center gap-1 whitespace-nowrap uppercase tracking-[0.12em] cursor-pointer ${active ? "text-admin" : "hover:text-text"}`}
+      >
+        {label}
+        <span aria-hidden className="w-2 text-[9px]">{active ? (order.dir === "asc" ? "▲" : "▼") : ""}</span>
+      </button>
+    </th>
+  );
+}
+
+const orderQuery = (o: UserOrder) => `&sort=${o.sort}&dir=${o.dir}`;
 
 export function UsersConsole({ adminEmail, adminId, portalUrl }: { adminEmail: string; adminId: string; portalUrl: string | null }) {
   const [q, setQ] = useState("");
@@ -28,21 +53,25 @@ export function UsersConsole({ adminEmail, adminId, portalUrl }: { adminEmail: s
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [more, setMore] = useState(false);
+  const [order, setOrder] = useState<UserOrder>(DEFAULT_USER_ORDER);
 
   // the search waits for a pause in typing
   useEffect(() => { const t = setTimeout(() => setQuery(q.trim()), 250); return () => clearTimeout(t); }, [q]);
 
+  // a header click: the same column turns around, a new column starts in its natural direction
+  const sortBy = (col: UserSort) => setOrder((o) => (o.sort === col ? { sort: col, dir: o.dir === "asc" ? "desc" : "asc" } : { sort: col, dir: defaultDir(col) }));
+
   const load = useCallback(async () => {
     setError("");
     try {
-      const res = await fetch(`/api/users?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+      const res = await fetch(`/api/users?q=${encodeURIComponent(query)}${orderQuery(order)}`, { cache: "no-store" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(errorText(res.status, body));
       setData(body as Data);
     } catch (e) {
       setError(`Could not load the users (${(e as Error).message}).`);
     }
-  }, [query]);
+  }, [query, order]);
   useEffect(() => { void load(); }, [load]);
 
   // the "more" control: the next page of 50, appended
@@ -51,7 +80,7 @@ export function UsersConsole({ adminEmail, adminId, portalUrl }: { adminEmail: s
     setMore(true);
     setError("");
     try {
-      const res = await fetch(`/api/users?q=${encodeURIComponent(query)}&skip=${data.users.length}`, { cache: "no-store" });
+      const res = await fetch(`/api/users?q=${encodeURIComponent(query)}&skip=${data.users.length}${orderQuery(order)}`, { cache: "no-store" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(errorText(res.status, body));
       const next = body as Data;
@@ -91,19 +120,20 @@ export function UsersConsole({ adminEmail, adminId, portalUrl }: { adminEmail: s
         <table className="w-full table-fixed text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-[0.12em] text-text-subtle border-b border-border">
-              <th className="px-3 py-2.5 font-normal w-[42%]">Person</th>
-              <th className="px-3 py-2.5 font-normal">Role</th>
-              <th className="px-3 py-2.5 font-normal">Waitlist</th>
-              <th className="px-3 py-2.5 font-normal">Created</th>
-              <th className="px-3 py-2.5 font-normal text-right w-[24%]">Set role</th>
+              <SortHeader col="name" label="Person" order={order} onSort={sortBy} className="w-[32%]" />
+              <th className={`${TH} w-[9%]`}>Role</th>
+              <th className={`${TH} w-[13%]`}>Waitlist</th>
+              <SortHeader col="created" label="Created" order={order} onSort={sortBy} className="w-[12%]" />
+              <SortHeader col="active" label="Last active" order={order} onSort={sortBy} className="w-[13%]" />
+              <th className={`${TH} text-right w-[21%]`}>Set role</th>
             </tr>
           </thead>
           <tbody>
             {data === null && !error && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-text-subtle">Loading...</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-text-subtle">Loading...</td></tr>
             )}
             {data?.users.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-text-subtle">{query ? "No one matches that search." : "No accounts yet."}</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-text-subtle">{query ? "No one matches that search." : "No accounts yet."}</td></tr>
             )}
             {data?.users.map((u) => {
               const self = u.id === adminId || (u.email !== "" && u.email.toLowerCase() === adminEmail.toLowerCase());
@@ -126,6 +156,10 @@ export function UsersConsole({ adminEmail, adminId, portalUrl }: { adminEmail: s
                     {u.role === "admin" || u.role === "developer" || u.role === "bot" ? <span className="text-text-subtle">always has access</span> : u.access === "waitlist" ? <span className="text-notice">waiting</span> : <span className="text-success">approved</span>}
                   </td>
                   <td className="px-3 py-3 text-text-muted text-xs">{shortWhen(u.createdAt)}</td>
+                  <td className="px-3 py-3 text-xs" data-testid="last-active" title={u.lastActive ? `${u.lastActive.kind === "played" ? "played" : "signed in"} ${shortWhen(u.lastActive.at)} UTC` : "no sign-in or play on record"}>
+                    <span className="block text-text-muted">{ago(u.lastActive?.at)}</span>
+                    {u.lastActive && <span className="block text-text-subtle">{u.lastActive.kind === "played" ? "played" : "signed in"}</span>}
+                  </td>
                   <td className="px-3 py-3 text-right">
                     <RoleControl
                       key={`${u.id}-${u.role}`}

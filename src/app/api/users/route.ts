@@ -1,6 +1,8 @@
 /**
  * Users, on the platform database directly (src/lib/repo/users.ts).
- *   GET  /api/users?q=&skip=           -> { users: [...], total, skip } (email, username or name; 50 a page, newest first)
+ *   GET  /api/users?q=&skip=&sort=&dir= -> { users: [...], total, skip, order } (email, username or name; 50 a page;
+ *                                         sort created | active | name, dir asc | desc; newest first by default; each
+ *                                         row carries lastActive: the later of the last sign-in and the last play)
  *   POST /api/users { userId, role }   -> { user, changed } (role: admin | developer | user; "user" is stored as the
  *                                         portal's "player")
  * Admin gate on both, same-origin JSON on the write. The signed-in admin cannot demote themselves (409
@@ -11,16 +13,18 @@ import { requireAdminApi, jsonError } from "@/lib/require-admin";
 import { readJsonBody } from "@/lib/proxy";
 import { jsonOk, withDb } from "@/lib/db-route";
 import { mongoDb } from "@/lib/mongo";
-import { parseRoleChange, searchUsers, setUserRole } from "@/lib/repo/users";
+import { parseRoleChange, parseUserOrder, searchUsers, setUserRole } from "@/lib/repo/users";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const g = await requireAdminApi(req, { write: false });
   if (!g.ok) return g.res;
-  const q = (req.nextUrl.searchParams.get("q") ?? "").slice(0, 80);
-  const skip = req.nextUrl.searchParams.get("skip") ?? "0";
-  const r = await withDb(async () => searchUsers(await mongoDb(), q, skip));
+  const sp = req.nextUrl.searchParams;
+  const q = (sp.get("q") ?? "").slice(0, 80);
+  const skip = sp.get("skip") ?? "0";
+  const order = parseUserOrder(sp.get("sort"), sp.get("dir"));
+  const r = await withDb(async () => searchUsers(await mongoDb(), q, skip, order));
   if (!r.ok) return r.res;
   return jsonOk(r.value);
 }

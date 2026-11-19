@@ -70,7 +70,7 @@ portal's source when jx-portal is checked out next to this repo.
 | Sidebar | Route | What it shows |
 | --- | --- | --- |
 | Overview | `/` | analytics home: the four counts in one row, a 7 / 30 / 90 day switch (`?range=`), eight line charts (players, sessions seated vs watching, play hours, rounds, peak concurrent, new accounts, JBux spent by pot + purchases, client errors vs reports), the per-game table for the range, the 5 newest admin actions |
-| Users > List | `/users` | search by email / username / name, role, waitlist state, set role; 50 a page, "more"; each row opens the user |
+| Users > List | `/users` | search by email / username / name, role, waitlist state, created, last active ("2 days ago": the later of the last sign-in and the last play), set role; sortable by name, created or last active; 50 a page, "more"; each row opens the user |
 | (User detail) | `/users/[id]` | every field of the users row (token / secret / hash fields redacted), role (settable), waitlist state, wallet summary, sign-ins (first + latest: all the portal stores), the activity line (plays per day, 1 week / 1 month / 1 year), play history and game sessions (50 a page each) |
 | Users > Waitlist | `/users/waitlist` | waiting and approved, approve, move back (`/waitlist` redirects here) |
 | Games > Overview | `/games/overview` | activity for 1 week / 1 month / 1 year (`?activity=7|30|365`): players and sessions per day across every game, the most active games ranked, and a players-per-day line for each of the top 10 |
@@ -141,8 +141,9 @@ states. No component uses the green `accent` classes (a test pins it).
 config pages. The rail draws the mark alone, where the portal draws its logo; the forbidden page draws the mark alone
 too, with no wordmark and no tag.
 
-**Header band**: the rail's logo row (the portal's 24 + 32 + 16 = 72 px) and every page's crumb row are one band of
-the same height (`--spacing-header`, class `h-header`), vertically centred, no border; the page title starts below.
+**Header band**: the rail's logo row (the portal's 24 + 40 + 16 = 80 px) and every page's crumb row are one band of
+the same height (`--spacing-header`, class `h-header`, pt-6 / pb-4, centred in the 40 px inside), no border, so the crumb sits on the
+mark's centre line; the title row below is the rail's account row (40 px, centred), so the title sits on the account chip's line.
 
 ## What uses what
 | Section | Reads | Writes |

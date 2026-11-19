@@ -46,6 +46,15 @@ before(async () => {
     { _id: OLD_ID, email: "old@example.com", name: "Old Account", username: "old", role: "player", createdAt: new Date("2026-09-01T00:00:00Z") },
     { _id: BOT_ID, email: "bot-1@crew.jazaix.com", name: "Crew 1", role: "bot", access: "waitlist", createdAt: new Date("2026-11-01T00:00:00Z") },
   ]);
+  // the last sign-ins and plays behind the Users list's Last active column: Old signed in, then played (hex user_id
+  // like the live rows); Alice only played (ObjectId user_id); Dev only signed in; the others have neither
+  await db.collection("users").updateOne({ _id: OLD_ID }, { $set: { lastLoginAt: new Date("2026-11-15T09:00:00Z") } });
+  await db.collection("users").updateOne({ _id: DEV_ID }, { $set: { lastLoginAt: new Date("2026-11-16T09:00:00Z") } });
+  await db.collection("play_history").insertMany([
+    { user_id: OLD_ID.toString(), game_id: "g1", played_at: new Date("2026-11-15T10:00:00Z") },
+    { user_id: OLD_ID.toString(), game_id: "g1", played_at: new Date("2026-11-17T10:00:00Z") },
+    { user_id: WAIT_A, game_id: "g1", played_at: new Date("2026-11-14T10:00:00Z") },
+  ]);
   await db.collection("wallets").insertMany([
     { userId: OLD_ID.toString(), balance: 150, funds: { real: 100, test: 0, promo: 50 }, hold: "admin" },
     { userId: WAIT_A.toString(), balance: 30, funds: { real: 0, test: 30, promo: 0 } },
@@ -153,6 +162,20 @@ test("users: search by email or username; set role writes users.role and audits;
   const all = await searchUsers(db, "");
   assert.equal(all.total, 6);
   assert.equal(all.users[0].email, "b@example.com"); // newest first
+  assert.deepEqual(all.order, { sort: "created", dir: "desc" });
+  // last active: the later of the sign-in and the play, from either id form of play_history.user_id
+  const by = Object.fromEntries(all.users.map((u) => [u.username ?? u.email, u.lastActive]));
+  assert.deepEqual(by.old, { at: "2026-11-17T10:00:00.000Z", kind: "played" });
+  assert.deepEqual(by.alice, { at: "2026-11-14T10:00:00.000Z", kind: "played" });
+  assert.deepEqual(by.dev, { at: "2026-11-16T09:00:00.000Z", kind: "signed-in" });
+  assert.equal(by.owner, null);
+  const active = await searchUsers(db, "", 0, { sort: "active", dir: "desc" });
+  assert.deepEqual(active.users.slice(0, 3).map((u) => u.username), ["old", "dev", "alice"]);
+  assert.equal(active.users[5].lastActive, null, "never active last");
+  const names = await searchUsers(db, "", 0, { sort: "name", dir: "asc" });
+  assert.deepEqual(names.users.map((u) => u.name), ["Alice Waiting", "Bob Waiting", "Crew 1", "Dev", "Old Account", "Owner"]);
+  const paged = await searchUsers(db, "", 2, { sort: "name", dir: "desc" });
+  assert.deepEqual(paged.users.map((u) => u.name), ["Dev", "Crew 1", "Bob Waiting", "Alice Waiting"]);
 
   const actor = { id: ADMIN_ID.toString(), email: "owner@jazaix.com" };
   const up = await setUserRole(db, { userId: OLD_ID.toString(), role: "developer", actor, now: NOW });

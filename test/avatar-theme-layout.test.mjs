@@ -68,13 +68,14 @@ test("the lockup: the portal's own logo file as the mark (masked, admin coloured
   assert.doesNotMatch(brand + read("src/app/sign-in/page.tsx") + read("src/components/PlainFrame.tsx"), /play\.jazaix\.com/, "no hotlinking the portal");
 });
 
-test("one header band: the rail logo row (pt-6 + h-8 + pb-4 = 72 px), the page crumb row and the plain strip share h-header", () => {
-  assert.match(read("src/app/globals.css"), /--spacing-header: 4\.5rem;/);
+test("one header band: the rail logo row (pt-6 + the 40 px mark-and-toggle row + pb-4 = 80 px), the page crumb row and the plain strip share h-header; the title row is the account row", () => {
+  assert.match(read("src/app/globals.css"), /--spacing-header: 5rem;/);
   const frame = read("src/components/SidebarFrame.tsx");
   assert.match(frame, /pt-6 pb-4 shrink-0 flex/);
   assert.match(frame, /<JxMark className="h-8 w-auto text-admin" \/>/);
   assert.doesNotMatch(frame, /py-6/, "no top padding above the page header band");
-  assert.match(read("src/components/PageHeader.tsx"), /h-header flex items-center/);
+  assert.match(read("src/components/PageHeader.tsx"), /h-header pt-6 pb-4 flex items-center/);
+  assert.match(read("src/components/PageHeader.tsx"), /min-h-10 flex flex-wrap items-center/, "the title row is the rail account row (40 px), centred");
   assert.doesNotMatch(read("src/components/PageHeader.tsx"), /border-b/, "the band has no border, like the rail's logo row");
   assert.match(read("src/components/PlainFrame.tsx"), /h-header pl-6 pr-3 flex items-center justify-between/);
 });

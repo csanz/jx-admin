@@ -7,7 +7,7 @@
  * createdAt, lastLoginAt, waitlistedAt, approvedAt, approvedBy { id, email }, waitlistEmails.<kind>, signupAs.
  * The console writes the same fields, so the portal keeps working against the same rows.
  */
-import { ObjectId, type Db } from "mongodb";
+import { ObjectId, type Db, type Document } from "mongodb";
 import { recordAdminAction } from "./audit.ts";
 import { parseSkip } from "./paging.ts";
 import { regexEscape } from "./values.ts";
@@ -32,6 +32,9 @@ export const USER_PROJECTION = {
   waitlistEmails: 1, signupAs: 1,
 } as const;
 
+/** When a person was last seen and how: their latest sign-in (users.lastLoginAt) or their latest play (play_history). */
+export type LastActive = { at: string; kind: "played" | "signed-in" };
+
 export type UserView = {
   id: string;
   email: string;
@@ -44,12 +47,23 @@ export type UserView = {
   access: Access;
   createdAt: string | null;
   lastLoginAt: string | null;
+  /** The latest play_history row's played_at, when the list looked it up (null otherwise). */
+  lastPlayedAt: string | null;
+  /** The later of lastLoginAt and lastPlayedAt, or null when neither is on record. */
+  lastActive: LastActive | null;
   waitlistedAt: string | null;
   approvedAt: string | null;
   approvedBy: string | null;
   emails: { joined: string | null; approved: string | null };
   signupAs: SignupAs | null;
 };
+
+/** Pure: the later of a sign-in and a play, with which it was; null when there is neither. */
+export function lastActiveOf(lastLoginAt: string | null, lastPlayedAt: string | null): LastActive | null {
+  if (lastPlayedAt && (!lastLoginAt || lastPlayedAt >= lastLoginAt)) return { at: lastPlayedAt, kind: "played" };
+  if (lastLoginAt) return { at: lastLoginAt, kind: "signed-in" };
+  return null;
+}
 
 /** A user document's access. Absent (an account from before the waitlist) = approved. */
 export function accessOf(doc: unknown): Access {
@@ -90,6 +104,8 @@ export function userView(u: UserDoc): UserView {
     access: accessOf(u),
     createdAt: iso(u.createdAt),
     lastLoginAt: iso(u.lastLoginAt),
+    lastPlayedAt: iso(u.lastPlayedAt),
+    lastActive: lastActiveOf(iso(u.lastLoginAt), iso(u.lastPlayedAt)),
     waitlistedAt: iso(u.waitlistedAt),
     approvedAt: iso(u.approvedAt),
     approvedBy: typeof by === "string" ? by : null,
@@ -135,16 +151,58 @@ export function userSearchFilter(q: unknown): Record<string, unknown> {
   return { $or: [{ email: re }, { username: re }, { name: re }] };
 }
 
-/** A page of USER_SEARCH_LIMIT users matching q, newest first, starting at `skip` (the list's "more" control). */
-export async function searchUsers(db: Db, q: unknown, skip: unknown = 0): Promise<{ users: UserView[]; total: number; skip: number }> {
+// ── ORDER (owner 2026-11-19: "a sorting mechanism for latest user sign in") ──────────────────────────────────────
+
+// The order itself (the columns, the default, the parser) lives in src/lib/user-order.ts, which the browser shares.
+import { DEFAULT_USER_ORDER, type UserOrder } from "../user-order.ts";
+export { DEFAULT_USER_ORDER, USER_SORTS, defaultDir, parseUserOrder, type SortDir, type UserOrder, type UserSort } from "../user-order.ts";
+
+/** The $sort for an order. _id breaks ties so pages never repeat or skip a row. */
+export function userSortSpec(order: UserOrder): Record<string, 1 | -1> {
+  const d: 1 | -1 = order.dir === "asc" ? 1 : -1;
+  const key = order.sort === "active" ? "lastActiveAt" : order.sort === "name" ? "name" : "createdAt";
+  return { [key]: d, _id: d };
+}
+
+const LATEST_PLAY: Document[] = [{ $sort: { played_at: -1 } }, { $limit: 1 }, { $project: { _id: 0, played_at: 1 } }];
+
+/**
+ * The stages that add lastPlayedAt (the person's latest play_history row) and lastActiveAt (the later of that and
+ * lastLoginAt). play_history.user_id is the user's ObjectId in some rows and its hex string in others, so the two
+ * forms are looked up separately, each an index seek on user_id_1_played_at_-1.
+ */
+export const LAST_ACTIVE_STAGES: Document[] = [
+  { $addFields: { idHex: { $toString: "$_id" } } },
+  { $lookup: { from: "play_history", localField: "_id", foreignField: "user_id", pipeline: LATEST_PLAY, as: "playByOid" } },
+  { $lookup: { from: "play_history", localField: "idHex", foreignField: "user_id", pipeline: LATEST_PLAY, as: "playByHex" } },
+  { $addFields: { lastPlayedAt: { $max: [{ $first: "$playByOid.played_at" }, { $first: "$playByHex.played_at" }] } } },
+  { $addFields: { lastActiveAt: { $max: ["$lastLoginAt", "$lastPlayedAt"] } } },
+];
+
+/**
+ * Pure: the pipeline for one page of the list. The last-play lookups cost one index seek per user, so they run after
+ * the page is cut unless the page is ordered by last active, when every matching user has to be looked up first.
+ */
+export function userListPipeline(filter: Record<string, unknown>, order: UserOrder, skip: number, limit: number): Document[] {
+  const page: Document[] = [{ $sort: userSortSpec(order) }, { $skip: skip }, { $limit: limit }];
+  const project: Document = { $project: { ...USER_PROJECTION, lastPlayedAt: 1, lastActiveAt: 1 } };
+  return order.sort === "active"
+    ? [{ $match: filter }, ...LAST_ACTIVE_STAGES, ...page, project]
+    : [{ $match: filter }, ...page, ...LAST_ACTIVE_STAGES, project];
+}
+
+/** A page of USER_SEARCH_LIMIT users matching q in `order` (newest first by default), starting at `skip` (the list's "more" control). */
+export async function searchUsers(db: Db, q: unknown, skip: unknown = 0, order: UserOrder = DEFAULT_USER_ORDER): Promise<{ users: UserView[]; total: number; skip: number; order: UserOrder }> {
   const users = db.collection<UserDoc>("users");
   const filter = userSearchFilter(q);
   const from = parseSkip(skip);
+  // names sort case-insensitively (the collation); dates and ids are unaffected by it
+  const options = order.sort === "name" ? { collation: { locale: "en", strength: 2 } } : {};
   const [total, list] = await Promise.all([
     users.countDocuments(filter),
-    users.find(filter, { projection: USER_PROJECTION }).sort({ createdAt: -1, _id: -1 }).skip(from).limit(USER_SEARCH_LIMIT).toArray(),
+    users.aggregate<UserDoc>(userListPipeline(filter, order, from, USER_SEARCH_LIMIT), options).toArray(),
   ]);
-  return { users: list.map(userView), total, skip: from };
+  return { users: list.map(userView), total, skip: from, order };
 }
 
 // ── SET ROLE ───────────────────────────────────────────────────────────────────────────────────────────────────

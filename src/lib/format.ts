@@ -31,6 +31,27 @@ export function shortWhen(iso: string | null | undefined): string {
   return `${day} ${time}`;
 }
 
+/**
+ * How long ago an ISO date was, in words: "just now", "5 minutes ago", "2 days ago", "3 months ago" (owner 2026-11-19,
+ * the Users list's Last active column). "never" for no date. `now` is injectable for the tests.
+ */
+export function ago(iso: string | null | undefined, now: number = Date.now()): string {
+  if (!iso) return "never";
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "n/a";
+  const s = Math.max(0, Math.round((now - t) / 1000));
+  if (s < 60) return "just now";
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"} ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return unit(m, "minute");
+  const h = Math.floor(m / 60);
+  if (h < 24) return unit(h, "hour");
+  const d = Math.floor(h / 24);
+  if (d < 30) return unit(d, "day");
+  if (d < 365) return unit(Math.floor(d / 30), "month");
+  return unit(Math.floor(d / 365), "year");
+}
+
 /** A duration in seconds as "1h 02m", "3m 05s" or "12.4s". */
 export function duration(s: number | null | undefined): string {
   if (typeof s !== "number" || !Number.isFinite(s)) return "n/a";

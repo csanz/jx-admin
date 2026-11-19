@@ -209,8 +209,9 @@ export function SidebarFrame({
           </button>
         </div>
         <main className="flex-1 min-w-0">
-          {/* No top padding: every page starts with PageHeader, whose crumb row is as tall as the rail's logo row
-              (h-header, centred), so the crumb sits on the mark's line. */}
+          {/* No top padding: every page starts with PageHeader, whose crumb row is the rail's logo row (h-header,
+              pt-6 / pb-4, centred in the 40 px inside), so the crumb sits on the mark's centre line, and whose title
+              row is the rail's account row (40 px), so the title sits on the account chip's line. */}
           <div className="px-4 pb-10 sm:px-8 min-w-0">{children}</div>
         </main>
       </div>

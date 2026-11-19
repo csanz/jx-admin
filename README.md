@@ -28,6 +28,7 @@ have one implementation.
   - `repo/catalog.ts`: the cosmetics catalog, every field the documents carry. Read only.
   - `repo/rooms.ts`: rooms (25 a page, filters) and one room with everything that names its `room_id`. Read only.
   - `repo/user-detail.ts`: one user, secrets redacted, wallet, sign-ins, play history, game sessions. Read only.
+  - `repo/games-overview.ts`: the games overview's series and ranking (game_sessions, matches, daily_stats; bots left out).
   - `repo/user-activity.ts`: one user's plays per UTC day over 1 week / 1 month / 1 year (`?activity=7|30|365`), for the activity line.
   - `repo/jbux-sales.ts`: purchases (receipts, KPIs, top lists), the catalog with its sales, sellers, wallets.
     Read only.
@@ -72,6 +73,7 @@ portal's source when jx-portal is checked out next to this repo.
 | Users > List | `/users` | search by email / username / name, role, waitlist state, set role; 50 a page, "more"; each row opens the user |
 | (User detail) | `/users/[id]` | every field of the users row (token / secret / hash fields redacted), role (settable), waitlist state, wallet summary, sign-ins (first + latest: all the portal stores), the activity line (plays per day, 1 week / 1 month / 1 year), play history and game sessions (50 a page each) |
 | Users > Waitlist | `/users/waitlist` | waiting and approved, approve, move back (`/waitlist` redirects here) |
+| Games > Overview | `/games/overview` | activity for 1 week / 1 month / 1 year (`?activity=7|30|365`): players and sessions per day across every game, the most active games ranked, and a players-per-day line for each of the top 10 |
 | Games > List | `/games` | search slug / name / creator, sort by plays / rounds / updated; 50 a page, "more" |
 | (Games detail) | `/games/[slug]` | the game's fields and counters, keys (no key values), join requests, its rooms (25 a page, `?page=`) |
 | Games > Rooms | `/games/rooms` | every room, newest updated first, filter by game and state, 25 a page with previous / next |

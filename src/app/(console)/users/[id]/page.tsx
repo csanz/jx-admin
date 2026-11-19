@@ -14,7 +14,8 @@ import { duration, num, shortWhen, when } from "@/lib/format";
 import { mongoDb } from "@/lib/mongo";
 import { loadForPage } from "@/lib/page-load";
 import { getUserDetail } from "@/lib/repo/user-detail";
-import { ACTIVITY_DEFAULT, ACTIVITY_RANGES, ACTIVITY_RANGE_LABEL, getUserActivity } from "@/lib/repo/user-activity";
+import { ACTIVITY_DEFAULT, getUserActivity } from "@/lib/repo/user-activity";
+import { RangeSwitch } from "@/components/RangeSwitch";
 import { LineChartPanel } from "@/components/charts/LineChartPanel";
 
 export const dynamic = "force-dynamic";
@@ -129,21 +130,7 @@ export default function UserPage({ params, searchParams }: { params: Promise<{ i
         <Section
           title="Activity"
           note={`${num(act.total)} ${act.total === 1 ? "play" : "plays"} on ${num(act.activeDays)} of the last ${act.days} days`}
-          right={
-            <nav aria-label="Activity range" className="flex items-center gap-1" data-testid="activity-range">
-              {ACTIVITY_RANGES.map((n) => (
-                <Link
-                  key={n}
-                  href={href({ activity: n })}
-                  scroll={false}
-                  aria-current={n === act.days ? "true" : undefined}
-                  className={`px-2.5 py-1 rounded-md border no-underline ${n === act.days ? "border-admin text-admin" : "border-border text-text-muted hover:text-text"}`}
-                >
-                  {ACTIVITY_RANGE_LABEL[n]}
-                </Link>
-              ))}
-            </nav>
-          }
+          right={<RangeSwitch days={act.days} hrefFor={(n) => href({ activity: n })} label="Activity range" />}
         >
           <LineChartPanel title="Plays per day" total={act.peak ? `busiest day ${num(act.peak)}` : "no plays in the range"} points={act.points} series={[{ key: "plays", label: "plays" }]} note="a play is one sitting in a game, from the play history; UTC days" curve="linear" />
         </Section>

@@ -80,3 +80,11 @@ test("the chart components import only react and recharts, and draw with the the
   const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
   assert.match(pkg.dependencies.recharts, /^\d+\.\d+\.\d+$/, "recharts pinned to an exact version");
 });
+
+test("the y axis is as wide as its widest label (a fixed width clipped 1,000 to ,000)", () => {
+  const src = fs.readFileSync(path.join(ROOT, "src/components/charts/LineChartPanel.tsx"), "utf8");
+  assert.match(src, /export function yAxisWidth\(points: ChartPoint\[\], series: ChartSeries\[\], decimals: number\): number/);
+  assert.match(src, /return Math\.max\(32, 10 \+ fmt\(max, decimals\)\.length \* 7\);/);
+  assert.match(src, /<YAxis [^\n]*width=\{axisWidth\}/);
+  assert.doesNotMatch(src, /width=\{\d+\}/, "no fixed axis width");
+});

@@ -46,7 +46,16 @@ function Tip({ active, label, payload, series, decimals }: TipProps) {
   );
 }
 
+/** The y-axis width for the widest tick label the series can produce (a fixed width clipped "1,000" to ",000"). */
+export function yAxisWidth(points: ChartPoint[], series: ChartSeries[], decimals: number): number {
+  let max = 0;
+  for (const p of points) for (const s of series) max = Math.max(max, Number(p[s.key]) || 0);
+  // the top tick can round above the max (1,420 -> 1,500); the label of the same digit count covers it
+  return Math.max(32, 10 + fmt(max, decimals).length * 7);
+}
+
 export function LineChartPanel({ title, total, points, series, decimals = 0, note, curve = "monotone" }: { title: string; total: string; points: ChartPoint[]; series: ChartSeries[]; decimals?: number; note?: string; curve?: "monotone" | "linear" }) {
+  const axisWidth = yAxisWidth(points, series, decimals);
   return (
     <section className="bg-surface border border-border rounded-xl p-3 min-w-0">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 mb-2">
@@ -66,10 +75,10 @@ export function LineChartPanel({ title, total, points, series, decimals = 0, not
       </div>
       <div className="jx-chart h-[220px] w-full">
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 400, height: 220 }}>
-          <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: -12 }}>
+          <LineChart data={points} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="day" tickFormatter={shortDay} tickLine={false} axisLine={false} minTickGap={24} />
-            <YAxis tickLine={false} axisLine={false} width={44} allowDecimals={decimals > 0} tickFormatter={(v: number) => fmt(v, decimals)} />
+            <YAxis tickLine={false} axisLine={false} width={axisWidth} allowDecimals={decimals > 0} tickFormatter={(v: number) => fmt(v, decimals)} />
             <Tooltip content={(p) => <Tip {...(p as unknown as TipProps)} series={series} decimals={decimals} />} cursor={{ className: "jx-cursor" }} isAnimationActive={false} />
             {series.map((s, i) => (
               <Line

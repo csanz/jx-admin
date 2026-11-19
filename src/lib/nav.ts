@@ -23,6 +23,7 @@ export const NAV: NavSection[] = [
     label: "Games",
     icon: "M3 4.5A1.5 1.5 0 0 1 4.5 3h6A1.5 1.5 0 0 1 12 4.5v6A1.5 1.5 0 0 1 10.5 12h-6A1.5 1.5 0 0 1 3 10.5zM12 4.5A1.5 1.5 0 0 1 13.5 3h6A1.5 1.5 0 0 1 21 4.5v6A1.5 1.5 0 0 1 19.5 12h-6A1.5 1.5 0 0 1 12 10.5zM3 13.5A1.5 1.5 0 0 1 4.5 12h6A1.5 1.5 0 0 1 12 13.5v6A1.5 1.5 0 0 1 10.5 21h-6A1.5 1.5 0 0 1 3 19.5zM12 13.5A1.5 1.5 0 0 1 13.5 12h6A1.5 1.5 0 0 1 21 13.5v6A1.5 1.5 0 0 1 19.5 21h-6A1.5 1.5 0 0 1 12 19.5z",
     items: [
+      { label: "Overview", href: "/games/overview" },
       { label: "List", href: "/games" },
       { label: "Rooms", href: "/games/rooms" },
     ],

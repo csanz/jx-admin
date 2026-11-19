@@ -7,20 +7,11 @@
  * No framework imports.
  */
 import type { Db, Document, Filter } from "mongodb";
-import { dayKeys, dayOf, seriesMax, seriesSum, type Point } from "./analytics.ts";
+import { dayKeys, dayOf, parseActivityRange, seriesMax, seriesSum, type ActivityRange, type Point } from "./analytics.ts";
 import { OBJECT_ID_RE } from "./users.ts";
 import { idForms } from "./user-detail.ts";
 
-export const ACTIVITY_RANGES = [7, 30, 365] as const;
-export type ActivityRange = (typeof ACTIVITY_RANGES)[number];
-export const ACTIVITY_RANGE_LABEL: Record<ActivityRange, string> = { 7: "1 week", 30: "1 month", 365: "1 year" };
-export const ACTIVITY_DEFAULT: ActivityRange = 30;
-
-/** ?activity= -> 7, 30 or 365 (default 30). */
-export function parseActivityRange(v: unknown): ActivityRange {
-  const n = typeof v === "string" ? Number(v) : v;
-  return (ACTIVITY_RANGES as readonly number[]).includes(n as number) ? (n as ActivityRange) : ACTIVITY_DEFAULT;
-}
+export { ACTIVITY_DEFAULT, ACTIVITY_RANGES, ACTIVITY_RANGE_LABEL, parseActivityRange, type ActivityRange } from "./analytics.ts";
 
 export type UserActivity = {
   days: ActivityRange;

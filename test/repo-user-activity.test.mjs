@@ -84,8 +84,10 @@ test("the user page draws the activity line above the play history with the thre
   const page = read("src/app/(console)/users/[id]/page.tsx");
   assert.match(page, /getUserActivity\(db, detail\.user\.id, \{ range: activity \}\)/);
   assert.match(page, /<Section\s+title="Activity"/);
-  assert.match(page, /ACTIVITY_RANGES\.map\(\(n\) =>/);
-  assert.match(page, /\{ACTIVITY_RANGE_LABEL\[n\]\}/);
+  assert.match(page, /<RangeSwitch days=\{act\.days\} hrefFor=\{\(n\) => href\(\{ activity: n \}\)\}/);
+  const sw = read("src/components/RangeSwitch.tsx");
+  assert.match(sw, /ACTIVITY_RANGES\.map\(\(n\) =>/);
+  assert.match(sw, /\{ACTIVITY_RANGE_LABEL\[n\]\}/);
   assert.match(page, /<LineChartPanel title="Plays per day"[^\n]*series=\{\[\{ key: "plays", label: "plays" \}\]\}/);
   assert.match(page, /curve="linear"/, "straight segments: a smooth curve would invent plays between days");
   assert.ok(page.indexOf('title="Activity"') < page.indexOf('title="Play history"'), "activity first");

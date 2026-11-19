@@ -3,7 +3,7 @@
  *   requireAdminPage()            for server components: the decision (the shell and the page redirect or render
  *                                 "Access forbidden"); cached per request, so the shell and the page share one read
  *   requireAdminApi(req, {write}) for route handlers: the admin, or the JSON response to return
- *                                 (401 signed out, 403 not an admin or a cross-site write, 500 config missing,
+ *                                 (401 signed out, 403 not an admin or a cross-site write, 503 config missing (no names: the log has them),
  *                                  504 database unreachable)
  * The decision itself is pure (src/lib/admin-gate.ts): allowlist AND the users row's role "admin", read from MongoDB
  * on every request through src/lib/repo/users.ts. test/routes-import-gate.test.mjs pins that every src/app/api
@@ -88,7 +88,7 @@ export async function requireAdminApi(req: NextRequest, opts: { write: boolean }
   } catch (e) {
     if (e instanceof EnvError) {
       console.error(`[jx-admin] ${e.message}`);
-      return { ok: false, res: jsonError("config-missing", 500, `Missing environment variables: ${e.missing.join(", ")}`) };
+      return { ok: false, res: jsonError("config-missing", 503, "The console is not configured.") };
     }
     throw e;
   }

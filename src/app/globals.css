@@ -96,6 +96,17 @@ h1, h2, h3, h4, h5, h6 {
   aspect-ratio: 313 / 64;
 }
 
+/* THE JX MARK: the portal's own logo file (jx-portal public/images/logo/logo-icon-dark.png, a white shape on
+   transparent, 1250 x 1068) used as a mask, so the shape is exactly the portal's and the fill is currentColor: the
+   admin colour on the rail and the plain pages (owner 2026-11-17: same logo, only the colour differs). */
+.jx-mark {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url("/images/logo/logo-icon-dark.png") no-repeat center / contain;
+  mask: url("/images/logo/logo-icon-dark.png") no-repeat center / contain;
+  aspect-ratio: 1250 / 1068;
+}
+
 /* Analytics charts (src/components/charts/LineChartPanel.tsx): every colour from the theme tokens, so both themes
    follow. Series 1 = the admin accent, 2 = text-muted, 3 = text-subtle dashed. */
 .jx-chart .recharts-cartesian-grid line { stroke: var(--color-border-subtle); }

@@ -160,3 +160,30 @@ test("server pages never call a helper exported from a 'use client' module (role
   assert.match(sellers, /<PersonCell person=\{s\.person\} portalUrl=\{portalUrl\} href=\{sellerHref\} \/>/);
   assert.match(sellers, /href=\{`\/users\/\$\{s\.person\.id\}`\}[^>]*>User page</);
 });
+
+test("the unconfigured page and the API say nothing about what is missing; the names go to the server log only (owner 2026-11-18)", () => {
+  const gate = fs.readFileSync(path.join(ROOT, "src/components/AdminGate.tsx"), "utf8");
+  const cfg = gate.slice(gate.indexOf("export function ConfigError"));
+  assert.match(cfg, /The console is unavailable right now/);
+  assert.match(cfg, /href=\{HOME_URL\}/, "a link back to the home page, like the forbidden page");
+  assert.doesNotMatch(cfg, /missing|\.map\(|MONGODB|AUTH_|GOOGLE_|JX_|env\.example|README/, "no variable names, no hints");
+  assert.match(gate, /if \(g\.kind === "config-error"\) return <ConfigError \/>;/);
+  assert.match(fs.readFileSync(path.join(ROOT, "src/components/Shell.tsx"), "utf8"), /<PlainFrame>\s*<ConfigError \/>/);
+  const req = fs.readFileSync(path.join(ROOT, "src/lib/require-admin.ts"), "utf8");
+  assert.doesNotMatch(req, /e\.missing\.join/, "the API answer never lists the names");
+  assert.match(req, /jsonError\("config-missing", 503, "The console is not configured\."\)/);
+  assert.match(req, /console\.error\(`\[jx-admin\] \$\{e\.message\}`\)/, "the server log keeps them");
+});
+
+test("the mark is the portal's own logo file through a mask, never a traced vector", () => {
+  const brand = fs.readFileSync(path.join(ROOT, "src/components/Brand.tsx"), "utf8");
+  assert.match(brand, /className=\{`jx-mark \$\{className\}`\}/);
+  assert.doesNotMatch(brand, /JX_MARK_PATH|<path|<svg/, "no hand-traced vector");
+  const css = fs.readFileSync(path.join(ROOT, "src/app/globals.css"), "utf8");
+  assert.match(css, /\.jx-mark \{[\s\S]*?mask: url\("\/images\/logo\/logo-icon-dark\.png"\) no-repeat center \/ contain;[\s\S]*?aspect-ratio: 1250 \/ 1068;/);
+  assert.ok(fs.existsSync(path.join(ROOT, "public/images/logo/logo-icon-dark.png")), "the portal's icon file is in public/");
+  assert.equal(fs.existsSync(path.join(ROOT, "public/brand/jx-mark-v2.svg")), false, "the wrong vector is gone");
+  // byte-identical to the portal's file when the portal checkout is beside this repo
+  const portalPng = path.resolve(ROOT, "../jx-portal/public/images/logo/logo-icon-dark.png");
+  if (fs.existsSync(portalPng)) assert.ok(fs.readFileSync(portalPng).equals(fs.readFileSync(path.join(ROOT, "public/images/logo/logo-icon-dark.png"))), "same bytes as the portal's logo");
+});

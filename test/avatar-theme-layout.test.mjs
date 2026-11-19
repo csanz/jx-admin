@@ -56,14 +56,11 @@ test("the admin accent is the notice orange in both themes; the fonts load like 
   }
 });
 
-test("the lockup: the portal's JX mark in currentColor, admin coloured, wordmark + assets copied into public/", () => {
+test("the lockup: the portal's own logo file as the mark (masked, admin coloured), wordmark + assets copied into public/", () => {
   const brand = read("src/components/Brand.tsx");
-  assert.match(brand, /fill="currentColor"/);
+  assert.match(brand, /jx-mark \$\{className\}/, "the mark is the masked logo file (test/shell-layout.test.mjs pins the file and the rule)");
   assert.match(brand, /text-admin/);
   assert.match(brand, /jx-wordmark/);
-  const svg = fs.readFileSync(path.join(ROOT, "public/brand/jx-mark-v2.svg"), "utf8");
-  const d = svg.match(/ d="([^"]+)"/)[1];
-  assert.ok(brand.includes(d), "the inline path is the portal's mark");
   assert.ok(fs.existsSync(path.join(ROOT, "public/brand/jazaix-wordmark.png")));
   assert.match(read("src/components/SidebarFrame.tsx"), /<JxMark className="h-8 w-auto text-admin" \/>/, "the rail draws the mark alone, in the admin colour");
   assert.match(read("src/components/PlainFrame.tsx"), /<Brand plain \/>/);

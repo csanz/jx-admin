@@ -15,7 +15,7 @@ import { SidebarFrame } from "./SidebarFrame";
  * The shell runs the admin gate itself and ONLY AN ADMIN gets the rail and the page:
  *   signed out    -> /sign-in
  *   not an admin  -> the plain "Access forbidden" page (no rail, no tree, the page is not rendered, no admin wording)
- *   config error  -> the plain config page (no rail)
+ *   config error  -> the plain "unavailable" page (no rail, no names: those go to the server log)
  *   admin         -> rail + the page
  * Each page still renders through gatedPage (src/components/AdminGate.tsx), so a page can never show its content to
  * a non-admin even if it were mounted outside this shell; the decision is cached per request, so the shell and the
@@ -27,7 +27,7 @@ export async function Shell({ children }: { children: ReactNode }) {
   if (g.kind === "config-error") {
     return (
       <PlainFrame>
-        <ConfigError missing={g.missing} />
+        <ConfigError />
       </PlainFrame>
     );
   }

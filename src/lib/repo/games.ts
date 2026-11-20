@@ -197,3 +197,9 @@ async function emailsFor(db: Db, ids: Array<string | null>): Promise<Map<string,
   const users = await db.collection("users").find({ _id: { $in: hex.map((h) => new ObjectId(h)) } }, { projection: { email: 1 } }).toArray();
   return new Map(users.filter((u) => typeof u.email === "string").map((u) => [idString(u._id) ?? "", u.email as string]));
 }
+
+/** Every game slug, sorted, for a filter box (Content > Clips). */
+export async function gameSlugs(db: Db): Promise<string[]> {
+  const slugs = await db.collection("games").distinct("slug");
+  return slugs.filter((s): s is string => typeof s === "string" && s !== "").sort();
+}

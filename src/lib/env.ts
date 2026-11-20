@@ -6,7 +6,8 @@
  * Required: the sign-in (AUTH_*, GOOGLE_*), the allowlist and the database (MONGODB_URI).
  * Optional: MONGODB_DB (default jx_portal); the portal link JX_PORTAL_URL + JX_ADMIN_API_TOKEN (both or neither;
  * only the two money actions, refund and hold, need it); RESEND_API_KEY + JX_EMAIL_FROM + JX_EMAIL_REPLY_TO (the
- * approval email; without the key, approving still works and the UI says no email went out).
+ * approval email; without the key, approving still works and the UI says no email went out); JX_CLIPS_API_URL (the
+ * clips API, jx-replays: Content > Clips reads it; without it that page says clips are not connected).
  */
 
 export const REQUIRED_ENV_NAMES = [
@@ -25,6 +26,7 @@ export const OPTIONAL_ENV_NAMES = [
   "RESEND_API_KEY",
   "JX_EMAIL_FROM",
   "JX_EMAIL_REPLY_TO",
+  "JX_CLIPS_API_URL",
 ] as const;
 
 export const ENV_NAMES = [...REQUIRED_ENV_NAMES, ...OPTIONAL_ENV_NAMES] as const;
@@ -59,6 +61,8 @@ export type AdminEnv = {
   portal: PortalLink | null;
   /** null = the approval email is not sent (the approval itself still happens). */
   email: EmailConfig | null;
+  /** The clips API origin (jx-replays) without a trailing slash; null = Content > Clips says clips are not connected. */
+  clipsApiUrl: string | null;
 };
 
 export const DEFAULT_EMAIL_FROM = "Jazaix <hello@updates.jazaix.com>";
@@ -98,6 +102,8 @@ export function validateEnv(env: EnvLike): { ok: true; config: AdminEnv } | { ok
       missing.push("JX_PORTAL_URL (not a URL)");
     }
   }
+  const clipsApiUrl = clipsApiUrlIfSet(env);
+  if (present(env.JX_CLIPS_API_URL) && !clipsApiUrl) missing.push("JX_CLIPS_API_URL (not an http(s) URL)");
   if (missing.length) return { ok: false, missing };
   return {
     ok: true,
@@ -117,8 +123,22 @@ export function validateEnv(env: EnvLike): { ok: true; config: AdminEnv } | { ok
             replyTo: present(env.JX_EMAIL_REPLY_TO) ? env.JX_EMAIL_REPLY_TO.trim() : null,
           }
         : null,
+      clipsApiUrl,
     },
   };
+}
+
+/** The clips API origin alone, when set and an http(s) URL (trailing slashes dropped), else null. */
+export function clipsApiUrlIfSet(env: EnvLike = process.env): string | null {
+  const v = env.JX_CLIPS_API_URL;
+  if (!present(v)) return null;
+  try {
+    const u = new URL(v.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString().replace(/\/+$/, "");
+  } catch {
+    return null;
+  }
 }
 
 /** The config, or an EnvError naming what is missing. */

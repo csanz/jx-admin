@@ -95,10 +95,16 @@ test("avatars: absolute https kept, portal paths resolved against the portal, el
   assert.match(comp, /onError=\{\(\) => setFailed\(true\)\}/);
   assert.match(comp, /src && !failed/);
   assert.match(comp, /initialOf\(label\)/);
-  // no raw <img> for a user picture anywhere else
+  // the clip poster (Content > Clips) follows the same rule: a client component that swaps a failed image for a blank box
+  const poster = read("src/components/Poster.tsx");
+  assert.match(poster, /^"use client";/);
+  assert.match(poster, /onError=\{\(\) => setFailed\(true\)\}/);
+  assert.match(poster, /src && !failed/);
+  assert.match(poster, /referrerPolicy="no-referrer"/);
+  // no raw <img> for a user picture (or a poster) anywhere else
   for (const f of files(path.join(ROOT, "src"))) {
-    if (!f.endsWith(".tsx") || f.endsWith("Avatar.tsx")) continue;
-    assert.doesNotMatch(fs.readFileSync(f, "utf8"), /<img\b/, `${path.relative(ROOT, f)} renders a raw <img>; use <Avatar>`);
+    if (!f.endsWith(".tsx") || f.endsWith("Avatar.tsx") || f.endsWith("Poster.tsx")) continue;
+    assert.doesNotMatch(fs.readFileSync(f, "utf8"), /<img\b/, `${path.relative(ROOT, f)} renders a raw <img>; use <Avatar> or <Poster>`);
   }
 });
 

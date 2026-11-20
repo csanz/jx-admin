@@ -30,6 +30,13 @@ export const NAV: NavSection[] = [
     ],
   },
   {
+    // CONTENT (owner 2026-11-20: "add content area in admin and a sub list for clips"): what players make. Clips first;
+    // the portal's own Content page (jx-portal /content) has the same shape, one tab per content type.
+    label: "Content",
+    icon: "M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5zM4 9h16M4 15h16M8 4v16M16 4v16",
+    items: [{ label: "Clips", href: "/content/clips" }],
+  },
+  {
     label: "Assets",
     icon: "m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9",
     items: [{ label: "Registry", href: "/assets" }],

@@ -82,6 +82,7 @@ portal's source when jx-portal is checked out next to this repo.
 | (Games detail) | `/games/[slug]` | the game's fields and counters, keys (no key values), join requests, its rooms (25 a page, `?page=`) |
 | Games > Rooms | `/games/rooms` | every room, newest updated first, filter by game and state, 25 a page with previous / next |
 | (Room detail) | `/games/rooms/[roomId]` | every field of the room, its sessions, matches (with timeline), server event log (newest or oldest first), latest live snapshots (formatted JSON), client reports; each list capped and counted |
+| Content > Clips | `/content/clips` | every clip in the clips pipeline (jx-replays clips API, `JX_CLIPS_API_URL`), newest first, filter by game and featured, 25 a page with previous / next; read only; without the URL the page says clips are not connected |
 | Assets > Registry | `/assets` | the asset registry (jxasset) is not built yet; links to JBux > Catalog (`/assets/catalog` redirects there) |
 | JBux > Purchases | `/jbux` | KPI tiles (today, 7 and 30 days: purchases, JBux spent by pot, real revenue, refunds), top 5 items and games in the date range, every receipt newest first with filters (game, kind, funding, state, env, sku, buyer, dates), 50 a page |
 | JBux > Catalog | `/jbux/catalog` | every priced item with its sales (count, JBux gross by pot, last sale), sort by gross / sales / sku; an item opens its receipts |
@@ -159,6 +160,7 @@ mark's centre line; the title row below is the rail's account row (40 px, centre
 | Games | MongoDB `games`, `game_keys` (label, environment, status, created only), `game_join_requests`, `rooms`, `users` (emails, names) | MongoDB `games.contributors[]` (a game's admins and contributors, + `admin_actions`) |
 | Rooms | MongoDB `rooms`, `game_sessions`, `matches`, `server_events`, `live_snapshots`, `client_reports` (all by `room_id`) | nothing |
 | User detail | MongoDB `users` (secrets redacted), `wallets`, `play_history` (+ `games` names), `game_sessions` (by `player_id`) | `users.role` through the same set-role control |
+| Content > Clips | clips API `GET /api/clips` (public list, no token), MongoDB `games` (slugs for the filter) | nothing |
 | Audit | MongoDB `admin_actions` | nothing (the other sections append to it) |
 | JBux report (ledger) | MongoDB `credit_transactions`, `wallets`, `users` | nothing |
 | JBux purchases, catalog, sellers, wallets | MongoDB `jbox_receipts`, `credit_transactions` (refunds), `catalog`, `games` (creators), `wallets`, `users` | nothing |
@@ -204,6 +206,7 @@ npm run build       # next build --webpack
    - Optional, both or neither: `JX_PORTAL_URL` = `https://play.jazaix.com` and `JX_ADMIN_API_TOKEN` = a long random
      string. The SAME token value goes into the portal (step 5). Without them, refund and hold are disabled.
    - Optional: `RESEND_API_KEY` (and `JX_EMAIL_FROM`, `JX_EMAIL_REPLY_TO`) for the approval email.
+   - Optional: `JX_CLIPS_API_URL` = `https://clips-api.jazaix.com` for Content > Clips (its public list, no token). Unset, that page says clips are not connected.
 3. **Domain**: Project > Settings > Domains > add `admin.jazaix.com`; add the CNAME Vercel shows at the DNS provider.
 4. **Google OAuth**: in the Google Cloud console, either create a new OAuth client (Web application) or add to the
    existing portal client the authorised redirect URI `https://admin.jazaix.com/api/auth/callback/google` (and the

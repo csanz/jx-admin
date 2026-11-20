@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_EMAIL_FROM, DEFAULT_MONGODB_DB, ENV_NAMES, EnvError, OPTIONAL_ENV_NAMES, REQUIRED_ENV_NAMES,
-  mongoIfSet, portalLinked, portalUrlIfSet, readEnv, validateEnv,
+  clipsApiUrlIfSet, mongoIfSet, portalLinked, portalUrlIfSet, readEnv, validateEnv,
 } from "../src/lib/env.ts";
 
 const REQUIRED = {
@@ -29,7 +29,21 @@ test("the names are exactly the ones in .env.example, required first", async () 
   const names = [...example.matchAll(/^([A-Z_]+)=/gm)].map((m) => m[1]);
   assert.deepEqual([...names].sort(), [...ENV_NAMES].sort());
   assert.deepEqual(REQUIRED_ENV_NAMES, ["AUTH_SECRET", "AUTH_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "JX_DEVELOPER_EMAILS", "MONGODB_URI"]);
-  assert.deepEqual(OPTIONAL_ENV_NAMES, ["MONGODB_DB", "JX_PORTAL_URL", "JX_ADMIN_API_TOKEN", "RESEND_API_KEY", "JX_EMAIL_FROM", "JX_EMAIL_REPLY_TO"]);
+  assert.deepEqual(OPTIONAL_ENV_NAMES, ["MONGODB_DB", "JX_PORTAL_URL", "JX_ADMIN_API_TOKEN", "RESEND_API_KEY", "JX_EMAIL_FROM", "JX_EMAIL_REPLY_TO", "JX_CLIPS_API_URL"]);
+});
+
+test("JX_CLIPS_API_URL: optional, an http(s) origin without its trailing slash; anything else is named, never a value", () => {
+  assert.equal(validateEnv(REQUIRED).config.clipsApiUrl, null);
+  assert.equal(validateEnv({ ...REQUIRED, JX_CLIPS_API_URL: "https://clips-api.jazaix.com/" }).config.clipsApiUrl, "https://clips-api.jazaix.com");
+  assert.equal(validateEnv({ ...REQUIRED, JX_CLIPS_API_URL: " http://127.0.0.1:6116 " }).config.clipsApiUrl, "http://127.0.0.1:6116");
+  const bad = validateEnv({ ...REQUIRED, JX_CLIPS_API_URL: "clips-api.jazaix.com" });
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.missing, ["JX_CLIPS_API_URL (not an http(s) URL)"]);
+  assert.equal(validateEnv({ ...REQUIRED, JX_CLIPS_API_URL: "ftp://x" }).ok, false);
+  assert.equal(clipsApiUrlIfSet({}), null);
+  assert.equal(clipsApiUrlIfSet({ JX_CLIPS_API_URL: "" }), null);
+  assert.equal(clipsApiUrlIfSet({ JX_CLIPS_API_URL: "https://clips-api.jazaix.com//" }), "https://clips-api.jazaix.com");
+  assert.equal(clipsApiUrlIfSet({ JX_CLIPS_API_URL: "nope" }), null);
 });
 
 test("the required six alone validate: Mongo on, portal link off, email off, db name defaulted", () => {

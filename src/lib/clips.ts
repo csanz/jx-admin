@@ -112,6 +112,12 @@ export function clipPeople(raw: { killer?: unknown; victim?: unknown; players?: 
   return { killer: person(raw.killer), victim: person(raw.victim) };
 }
 
+/** A player's label in a cell: the name, with " (crew)" for a bot unless the name already carries the [CREW] tag. Pure. */
+export function clipPersonLabel(p: ClipPerson): string {
+  if (!p.bot || /\[CREW\]/i.test(p.name)) return p.name;
+  return `${p.name} (crew)`;
+}
+
 /** One wire record as a table row, or null when it is not a clip (no id or no video). Pure. */
 export function clipRow(raw: unknown): ClipRow | null {
   if (!raw || typeof raw !== "object") return null;
@@ -154,7 +160,8 @@ export function clipShareUrl(portalUrl: string | null, row: Pick<ClipRow, "game"
 /** The whole count: the API's X-Total-Count, or, without the header (an older API), what this page proves. Pure. */
 export function clipsTotal(header: string | null, offset: number, got: number, pageSize: number): number {
   const n = header === null ? NaN : Math.floor(Number(header));
-  if (Number.isFinite(n) && n >= 0) return Math.max(n, offset + got);
+  // the header, unless this page proves more; an empty page past the end proves nothing
+  if (Number.isFinite(n) && n >= 0) return got > 0 ? Math.max(n, offset + got) : n;
   // no header: at least this page; a full page means there may be one more
   return offset + got + (got >= pageSize ? 1 : 0);
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BODY_ROW, Clip, HEAD_ROW, TableFrame, TD, TH } from "@/components/ListBits";
 import { Poster } from "@/components/Poster";
 import { duration, num, shortWhen } from "@/lib/format";
-import { clipShareUrl, type ClipPerson, type ClipRow } from "@/lib/clips";
+import { clipPersonLabel, clipShareUrl, type ClipPerson, type ClipRow } from "@/lib/clips";
 
 /** The words for a clip's tags (the portal's CLIP_TAG_WORDS, jx-portal src/lib/game-clips-core.ts). */
 const TAG_WORDS: Readonly<Record<string, string>> = { headshot: "HEADSHOT", "long-shot": "LONG SHOT", "final-kill": "FINAL KILL", airborne: "AIRBORNE", sliding: "SLIDING" };
@@ -10,7 +10,7 @@ const TAG_WORDS: Readonly<Record<string, string>> = { headshot: "HEADSHOT", "lon
 /** A player in a clip: the name, linking to the user page when they were signed in; bots marked. */
 function Person({ p }: { p: ClipPerson | null }) {
   if (!p) return <span className="text-text-subtle">n/a</span>;
-  const label = p.bot ? `${p.name} (crew)` : p.name;
+  const label = clipPersonLabel(p);
   if (p.userId) {
     return (
       <Link href={`/users/${p.userId}`} className="block truncate text-text hover:text-admin no-underline" title={label}>{label}</Link>
@@ -33,12 +33,12 @@ export function ClipsTable({ rows, portalUrl }: { rows: ClipRow[]; portalUrl: st
         <tr className={HEAD_ROW}>
           <th className={`${TH} w-[12%]`}>Clip</th>
           <th className={`${TH} w-[11%]`}>Game</th>
-          <th className={`${TH} w-[14%]`}>Shooter</th>
-          <th className={`${TH} w-[14%]`}>Hit</th>
-          <th className={`${TH} w-[17%]`}>Shot</th>
+          <th className={`${TH} w-[13%]`}>Shooter</th>
+          <th className={`${TH} w-[13%]`}>Hit</th>
+          <th className={`${TH} w-[15%]`}>Shot</th>
           <th className={`${TH} w-[6%] text-right`}>Saves</th>
-          <th className={`${TH} w-[7%]`}>Featured</th>
-          <th className={`${TH} w-[9%]`}>Stays</th>
+          <th className={`${TH} w-[9%]`}>Featured</th>
+          <th className={`${TH} w-[11%]`}>Stays</th>
           <th className={`${TH} w-[10%]`}>Made</th>
         </tr>
       </thead>

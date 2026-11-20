@@ -8,7 +8,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  CLIPS_API_PAGE_MAX, CLIPS_OFF_MESSAGE, CLIPS_PAGE_SIZE, clipPeople, clipRow, clipShareUrl, clipsApiSearch, clipsTotal, loadClips, parseClipsQuery,
+  CLIPS_API_PAGE_MAX, CLIPS_OFF_MESSAGE, CLIPS_PAGE_SIZE, clipPeople, clipPersonLabel, clipRow, clipShareUrl, clipsApiSearch, clipsTotal, loadClips, parseClipsQuery,
 } from "../src/lib/clips.ts";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
@@ -50,6 +50,10 @@ test("clipPeople: names from the record, platform ids from players; a bot is mar
   assert.deepEqual(clipPeople({ killer: { id: 1, name: "X", pid: "not-an-object-id" } }).killer, { name: "X", bot: false, userId: null });
   assert.deepEqual(clipPeople({ killer: { id: 4 } }).killer, { name: "player 4", bot: false, userId: null });
   assert.deepEqual(clipPeople({ killer: null, victim: "x" }), { killer: null, victim: null });
+  // the cell label: a bot says so once (the engine's names already carry [CREW])
+  assert.equal(clipPersonLabel({ name: "Ace", bot: false, userId: PID }), "Ace");
+  assert.equal(clipPersonLabel({ name: "Rook", bot: true, userId: null }), "Rook (crew)");
+  assert.equal(clipPersonLabel({ name: "Onyx [CREW]", bot: true, userId: null }), "Onyx [CREW]");
 });
 
 test("clipRow: the row the table shows; kept when nobody's save expires; not a clip without an id or a video", () => {
@@ -95,6 +99,7 @@ test("clipShareUrl: the portal's share page, or null without a portal URL or a g
 test("clipsTotal: the header wins (never below what the page proves); without it a full page allows one more", () => {
   assert.equal(clipsTotal("11", 0, 11, 25), 11);
   assert.equal(clipsTotal("11", 25, 3, 25), 28);
+  assert.equal(clipsTotal("11", 25, 0, 25), 11, "an empty page past the end keeps the header's count");
   assert.equal(clipsTotal("x", 0, 5, 25), 5);
   assert.equal(clipsTotal(null, 0, 25, 25), 26);
   assert.equal(clipsTotal(null, 50, 7, 25), 57);
@@ -163,6 +168,9 @@ test("against a server: pages of 25 with the whole count, the filters passed thr
   assert.equal(g.value.total, 0);
   assert.deepEqual(g.value.rows, []);
   assert.equal(g.value.pageCount, 1);
+  // a page past the end: no rows, the count and the page count unchanged (the page offers a way back)
+  const p3 = await loadClips(base, parseClipsQuery({ page: "3" }));
+  assert.deepEqual([p3.value.rows.length, p3.value.total, p3.value.pageCount, p3.value.page], [0, 31, 2, 3]);
 });
 
 test("against a server: no X-Total-Count still pages (a full page offers one more), junk records are dropped", async () => {

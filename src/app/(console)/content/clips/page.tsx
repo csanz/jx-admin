@@ -63,7 +63,14 @@ export default function ClipsPage({ searchParams }: { searchParams: SP }) {
             {!r.ok ? (
               <LoadError what="the clips" message={r.message} />
             ) : r.value.rows.length === 0 ? (
-              <p className="text-sm text-text-subtle" data-testid="clips-empty">{filtered ? "No clip matches that filter." : "No clips yet."}</p>
+              <>
+                <p className="text-sm text-text-subtle" data-testid="clips-empty">
+                  {r.value.total > 0 ? "Nothing on this page." : filtered ? "No clip matches that filter." : "No clips yet."}
+                </p>
+                {r.value.total > 0 && (
+                  <Link href={hrefFor(1)} className="mt-3 inline-block px-3 py-1.5 text-sm text-text-muted border border-border rounded-md hover:text-text no-underline">Back to page 1</Link>
+                )}
+              </>
             ) : (
               <>
                 <ClipsTable rows={r.value.rows} portalUrl={portalUrlIfSet()} />
